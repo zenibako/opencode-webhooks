@@ -1,9 +1,14 @@
 {
   "name": "@opencode/webhook-plugin",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Opencode plugin for sending webhook notifications on any Opencode event",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
@@ -12,6 +17,7 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
     "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix",
+    "package": "npm run build && npm pack",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

@@ -443,6 +443,9 @@ npm run build
 
 # Watch mode for development
 npm run watch
+
+# Create npm package (build + pack)
+npm run package
 ```
 
 ### GitHub Actions CI/CD
@@ -453,7 +456,9 @@ This project uses GitHub Actions for continuous integration and deployment:
   - Lints code with ESLint
   - Runs tests on Node.js 18 and 20
   - Builds TypeScript
+  - Creates and verifies npm package
   - Reports test coverage
+  - Uploads package artifact
 
 - **PR Checks** - Additional validation for pull requests
   - Type checking
@@ -470,6 +475,31 @@ This project uses GitHub Actions for continuous integration and deployment:
 - **ESLint** - Strict TypeScript linting rules
 - **TypeScript** - Full type safety
 - **Jest** - Modern testing framework
+
+## Publishing
+
+### Automated Release Process
+
+The package is automatically published to npm when a new GitHub release is created:
+
+1. Update version: `npm version patch|minor|major`
+2. Push changes: `git push && git push --tags`
+3. Create a GitHub release with the version tag
+4. The Release workflow automatically:
+   - Verifies version matches release tag
+   - Runs all tests and quality checks
+   - Builds and publishes to npm with provenance
+   - Uploads release assets
+   - Creates a detailed release summary
+
+See [RELEASE.md](./RELEASE.md) for detailed release instructions.
+
+### NPM Package Verification
+
+The CI pipeline includes npm publish verification:
+- Dry-run publish on every build
+- Package content validation
+- Ensures publishability before release
 
 ## License
 
