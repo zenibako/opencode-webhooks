@@ -1,0 +1,31 @@
+{
+  "name": "@opencode/webhook-plugin",
+  "version": "1.0.0",
+  "description": "Opencode plugin for sending webhook notifications on any Opencode event",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "webhook",
+    "notifications",
+    "slack"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "peerDependencies": {
+    "opencode": "*"
+  }
+}
