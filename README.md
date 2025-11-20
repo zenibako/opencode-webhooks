@@ -476,6 +476,31 @@ This project uses GitHub Actions for continuous integration and deployment:
 - **TypeScript** - Full type safety
 - **Jest** - Modern testing framework
 
+## Publishing
+
+### Automated Release Process
+
+The package is automatically published to npm when a new GitHub release is created:
+
+1. Update version: `npm version patch|minor|major`
+2. Push changes: `git push && git push --tags`
+3. Create a GitHub release with the version tag
+4. The Release workflow automatically:
+   - Verifies version matches release tag
+   - Runs all tests and quality checks
+   - Builds and publishes to npm with provenance
+   - Uploads release assets
+   - Creates a detailed release summary
+
+See [RELEASE.md](./RELEASE.md) for detailed release instructions.
+
+### NPM Package Verification
+
+The CI pipeline includes npm publish verification:
+- Dry-run publish on every build
+- Package content validation
+- Ensures publishability before release
+
 ## License
 
 MIT

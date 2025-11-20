@@ -138,6 +138,12 @@ jobs:
 
           echo "✅ Package contents verified successfully"
 
+      - name: Test npm publish (dry-run)
+        run: |
+          echo "Testing npm publish with dry-run..."
+          npm publish --dry-run
+          echo "✅ Package can be published successfully"
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
