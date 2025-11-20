@@ -1,5 +1,5 @@
 {
-  "name": "@opencode/webhook-plugin",
+  "name": "opencode-webhooks",
   "version": "0.0.1",
   "description": "Opencode plugin for sending webhook notifications on any Opencode event",
   "main": "dist/index.js",
