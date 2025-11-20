@@ -443,6 +443,9 @@ npm run build
 
 # Watch mode for development
 npm run watch
+
+# Create npm package (build + pack)
+npm run package
 ```
 
 ### GitHub Actions CI/CD
@@ -453,7 +456,9 @@ This project uses GitHub Actions for continuous integration and deployment:
   - Lints code with ESLint
   - Runs tests on Node.js 18 and 20
   - Builds TypeScript
+  - Creates and verifies npm package
   - Reports test coverage
+  - Uploads package artifact
 
 - **PR Checks** - Additional validation for pull requests
   - Type checking
