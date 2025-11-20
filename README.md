@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![npm version](https://badge.fury.io/js/@opencode%2Fwebhook-plugin.svg)](https://badge.fury.io/js/@opencode%2Fwebhook-plugin)
+[![npm version](https://badge.fury.io/js/opencode-webhooks.svg)](https://badge.fury.io/js/opencode-webhooks)
 
 A powerful TypeScript plugin for Opencode that enables sending webhook notifications on any Opencode event. Perfect for integrating with Slack, Discord, Microsoft Teams, or any custom webhook endpoint.
 
@@ -19,23 +19,80 @@ A powerful TypeScript plugin for Opencode that enables sending webhook notificat
 
 ## Installation
 
+### For Use with Opencode
+
+To use this plugin with Opencode, install the example files directly into your Opencode plugins directory:
+
 ```bash
-npm install @opencode/webhook-plugin
+# Navigate to your Opencode plugins directory
+cd ~/.opencode/plugins
+
+# Clone or download the example you want to use
+curl -O https://raw.githubusercontent.com/yourusername/opencode-webhooks/main/examples/slack-idle-notification.ts
+
+# Or copy any of the example files:
+# - slack-idle-notification.ts - Send Slack notifications when sessions go idle
+# - simple-webhook.ts - Basic webhook configuration
+# - advanced-usage.ts - Multiple webhooks with advanced features
+# - integration-example.ts - Full integration example
 ```
 
-Or if you're developing locally:
+### For NPM Installation
+
+If you prefer to install as an npm package:
+
+```bash
+npm install opencode-webhooks
+```
+
+### For Local Development
+
+If you're developing the plugin locally:
 
 ```bash
 npm install
 npm run build
 ```
 
+## Quick Start with Opencode
+
+1. **Copy an example file to your Opencode plugins directory:**
+
+```bash
+# Create the plugins directory if it doesn't exist
+mkdir -p ~/.opencode/plugins
+
+# Download the Slack idle notification example
+curl -o ~/.opencode/plugins/slack-webhook.ts \
+  https://raw.githubusercontent.com/yourusername/opencode-webhooks/main/examples/slack-idle-notification.ts
+```
+
+2. **Edit the file to add your webhook URL:**
+
+```bash
+# Edit the file to replace YOUR/WEBHOOK/URL with your actual Slack webhook URL
+nano ~/.opencode/plugins/slack-webhook.ts
+```
+
+3. **Restart Opencode** - The plugin will be automatically loaded!
+
+### Available Examples
+
+All examples can be installed directly as Opencode plugins:
+
+- **`slack-idle-notification.ts`** - Sends formatted Slack messages when your Opencode session goes idle
+- **`simple-webhook.ts`** - Basic webhook configuration for session events  
+- **`advanced-usage.ts`** - Multiple webhooks for different events (Slack, Discord, Teams, custom endpoints)
+- **`integration-example.ts`** - Complete integration example showing how to use with Opencode
+
+You can view all examples in the [examples directory](./examples/).
+
 ## Quick Start
 
 ### Basic Usage
 
 ```typescript
-import { createWebhookPlugin, OpencodeEventType } from '@opencode/webhook-plugin';
+import { createWebhookPlugin, OpencodeEventType } from 'opencode-webhooks';
 
 const webhookPlugin = createWebhookPlugin({
   webhooks: [
@@ -50,8 +107,8 @@ const webhookPlugin = createWebhookPlugin({
   debug: true,
 });
 
-// Register with Opencode
-opencode.use(webhookPlugin);
+// Export for Opencode to load
+export { webhookPlugin };
 ```
 
 ### Slack Idle Notification Example
@@ -59,7 +116,7 @@ opencode.use(webhookPlugin);
 Send a formatted Slack message when a session becomes idle:
 
 ```typescript
-import { createWebhookPlugin, OpencodeEventType, SlackMessage } from '@opencode/webhook-plugin';
+import { createWebhookPlugin, OpencodeEventType, SlackMessage } from 'opencode-webhooks';
 
 const webhookPlugin = createWebhookPlugin({
   webhooks: [
@@ -415,7 +472,7 @@ import {
   BaseEventPayload,
   WebhookResult,
   SlackMessage,
-} from '@opencode/webhook-plugin';
+} from 'opencode-webhooks';
 ```
 
 ## Development

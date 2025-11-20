@@ -2,8 +2,12 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "opencode-webhooks": ["./src/index.ts"]
+    }
   },
-  "include": ["src/**/*", "tests/**/*", "jest.config.js"],
+  "include": ["src/**/*", "tests/**/*", "examples/**/*", "jest.config.js"],
   "exclude": ["node_modules", "dist", "coverage"]
 }

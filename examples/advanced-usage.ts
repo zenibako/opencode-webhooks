@@ -12,7 +12,7 @@ import {
   createWebhookPlugin,
   OpencodeEventType,
   BaseEventPayload,
-} from '../src';
+} from 'opencode-webhooks';
 
 const webhookPlugin = createWebhookPlugin({
   webhooks: [

@@ -5,7 +5,7 @@
  * It sends all session events to a generic webhook endpoint.
  */
 
-import { createWebhookPlugin, OpencodeEventType } from '../src';
+import { createWebhookPlugin, OpencodeEventType } from 'opencode-webhooks';
 
 const webhookPlugin = createWebhookPlugin({
   webhooks: [

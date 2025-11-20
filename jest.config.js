@@ -12,4 +12,7 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   verbose: true,
+  moduleNameMapper: {
+    '^opencode-webhooks$': '<rootDir>/src/index.ts',
+  },
 };

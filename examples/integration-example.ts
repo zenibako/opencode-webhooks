@@ -7,7 +7,7 @@
 
 // In your Opencode project (e.g., opencode.config.ts)
 
-import { createWebhookPlugin, OpencodeEventType } from '@opencode/webhook-plugin';
+import { createWebhookPlugin, OpencodeEventType, BaseEventPayload } from 'opencode-webhooks';
 
 // Create the plugin instance
 const webhookPlugin = createWebhookPlugin({
@@ -15,7 +15,7 @@ const webhookPlugin = createWebhookPlugin({
     {
       url: process.env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL',
       events: [OpencodeEventType.SESSION_IDLE],
-      transformPayload: (payload) => ({
+      transformPayload: (payload: BaseEventPayload) => ({
         text: `⏸️ Session ${payload.sessionId} is now idle`,
         blocks: [
           {
@@ -40,6 +40,9 @@ export default {
   ],
   // ... other configuration
 };
+
+// Also export the plugin for testing
+export { webhookPlugin };
 
 /**
  * Alternative: Direct registration with Opencode instance

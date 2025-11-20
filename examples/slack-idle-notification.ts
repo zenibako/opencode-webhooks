@@ -5,7 +5,7 @@
  * Slack notification when an Opencode session becomes idle.
  */
 
-import { createWebhookPlugin, OpencodeEventType, SlackMessage } from '../src';
+import { createWebhookPlugin, OpencodeEventType, SlackMessage } from 'opencode-webhooks';
 
 // Replace with your actual Slack webhook URL
 const SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL';
