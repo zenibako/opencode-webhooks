@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+*.tgz
 
 # IDE
 .vscode/

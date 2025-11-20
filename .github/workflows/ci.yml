@@ -98,6 +98,53 @@ jobs:
           fi
           echo "Build output verified successfully"
 
+      - name: Create npm package
+        run: npm pack
+
+      - name: Verify package contents
+        run: |
+          # Extract the tarball
+          TARBALL=$(ls *.tgz)
+          echo "Package created: $TARBALL"
+
+          # Get package size
+          SIZE=$(du -h "$TARBALL" | cut -f1)
+          echo "Package size: $SIZE"
+
+          # List contents
+          echo "Package contents:"
+          tar -tzf "$TARBALL" | head -20
+
+          # Verify essential files are included
+          echo ""
+          echo "Verifying essential files..."
+          tar -tzf "$TARBALL" | grep -q "package/package.json" || (echo "❌ package.json missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/README.md" || (echo "❌ README.md missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/LICENSE" || (echo "❌ LICENSE missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/dist/index.js" || (echo "❌ dist/index.js missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/dist/index.d.ts" || (echo "❌ dist/index.d.ts missing" && exit 1)
+
+          # Check that node_modules is NOT included
+          if tar -tzf "$TARBALL" | grep -q "package/node_modules/"; then
+            echo "❌ node_modules should not be in package"
+            exit 1
+          fi
+
+          # Check that tests are NOT included
+          if tar -tzf "$TARBALL" | grep -q "package/tests/"; then
+            echo "❌ tests should not be in package"
+            exit 1
+          fi
+
+          echo "✅ Package contents verified successfully"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: "*.tgz"
+          retention-days: 7
+
   # Combined check that runs after all other jobs
   ci-success:
     name: CI Success
