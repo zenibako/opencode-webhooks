@@ -15,8 +15,8 @@ const webhookPlugin = createWebhookPlugin({
 
       // Events to listen for
       events: [
-        OpencodeEventType.SESSION_START,
-        OpencodeEventType.SESSION_END,
+        OpencodeEventType.SESSION_CREATED,
+        OpencodeEventType.SESSION_DELETED,
         OpencodeEventType.SESSION_IDLE,
       ],
 

@@ -34,18 +34,18 @@ const webhookPlugin = createWebhookPlugin({
       }),
     },
 
-    // 2. Slack: Build failures
+    // 2. Slack: Session error notifications
     {
       url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK',
-      events: [OpencodeEventType.BUILD_FAILED],
+      events: [OpencodeEventType.SESSION_ERROR],
       transformPayload: (payload) => ({
-        text: '❌ Build Failed',
+        text: '❌ Session Error',
         blocks: [
           {
             type: 'header',
             text: {
               type: 'plain_text',
-              text: '❌ Build Failed',
+              text: '❌ Session Error',
               emoji: true,
             },
           },
@@ -60,12 +60,13 @@ const webhookPlugin = createWebhookPlugin({
       }),
     },
 
-    // 3. Slack: Test failures
+    // 3. Slack: Test notifications (using command executed for demonstration)
     {
       url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK',
-      events: [OpencodeEventType.TEST_FAILED],
+      events: [OpencodeEventType.COMMAND_EXECUTED],
+      shouldSend: (payload) => payload.command?.includes('test') || false,
       transformPayload: (payload) => ({
-        text: `🧪 Tests failed: ${payload.failedCount || 0} test(s)`,
+        text: `🧪 Test command executed: ${payload.command}`,
       }),
     },
 
@@ -73,10 +74,10 @@ const webhookPlugin = createWebhookPlugin({
     {
       url: 'https://your-custom-webhook.example.com/api/opencode-events',
       events: [
-        OpencodeEventType.SESSION_START,
-        OpencodeEventType.SESSION_END,
+        OpencodeEventType.SESSION_CREATED,
+        OpencodeEventType.SESSION_DELETED,
         OpencodeEventType.SESSION_IDLE,
-        OpencodeEventType.SESSION_ACTIVE,
+        OpencodeEventType.SESSION_STATUS,
       ],
       headers: {
         'Authorization': 'Bearer YOUR_API_TOKEN',
@@ -89,7 +90,7 @@ const webhookPlugin = createWebhookPlugin({
     // 5. Discord webhook: Error notifications
     {
       url: 'https://discord.com/api/webhooks/YOUR/WEBHOOK',
-      events: [OpencodeEventType.ERROR_OCCURRED],
+      events: [OpencodeEventType.SESSION_ERROR],
       transformPayload: (payload) => ({
         content: '⚠️ An error occurred in Opencode',
         embeds: [
@@ -118,7 +119,7 @@ const webhookPlugin = createWebhookPlugin({
     // 6. Filtered webhook: Only send if certain conditions are met
     {
       url: 'https://hooks.slack.com/services/YOUR/CRITICAL/WEBHOOK',
-      events: [OpencodeEventType.ERROR_OCCURRED],
+      events: [OpencodeEventType.SESSION_ERROR],
       // Only send webhook if the error is critical
       shouldSend: (payload: BaseEventPayload) => {
         // Custom logic to determine if this is a critical error
@@ -153,17 +154,14 @@ const webhookPlugin = createWebhookPlugin({
     {
       url: 'https://outlook.office.com/webhook/YOUR/TEAMS/WEBHOOK',
       events: [
-        OpencodeEventType.BUILD_SUCCESS,
-        OpencodeEventType.TEST_SUCCESS,
+        OpencodeEventType.SESSION_COMPACTED,
       ],
       transformPayload: (payload) => ({
         '@type': 'MessageCard',
         '@context': 'https://schema.org/extensions',
-        summary: 'Build/Test Success',
+        summary: 'Session Compacted',
         themeColor: '00FF00',
-        title: payload.eventType === OpencodeEventType.BUILD_SUCCESS
-          ? '✅ Build Successful'
-          : '✅ Tests Passed',
+        title: '✅ Session Compacted',
         sections: [
           {
             facts: [

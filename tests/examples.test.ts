@@ -18,17 +18,14 @@ describe('Example Files', () => {
 
     it('should export webhookPlugin', () => {
       expect(slackIdleNotification.webhookPlugin).toBeDefined();
-      expect(typeof slackIdleNotification.webhookPlugin).toBe('object');
+      expect(typeof slackIdleNotification.webhookPlugin).toBe('function');
     });
 
     it('should create a valid webhook plugin configuration', () => {
       const { webhookPlugin } = slackIdleNotification;
       
-      // Verify it has the register method (plugin interface)
-      expect(typeof webhookPlugin.register).toBe('function');
-      
-      // Verify it has the handleEvent method
-      expect(typeof webhookPlugin.handleEvent).toBe('function');
+      // Verify it returns a function (plugin interface)
+      expect(typeof webhookPlugin).toBe('function');
     });
   });
 

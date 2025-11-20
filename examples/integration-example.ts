@@ -54,7 +54,7 @@ export { webhookPlugin };
 //
 // // Now the plugin will automatically handle events
 // // You can manually trigger events for testing:
-// opencode.emit('session:idle', {
+// opencode.emit('session.idle', {
 //   sessionId: 'test-session-123',
 //   userId: 'user-456',
 // });

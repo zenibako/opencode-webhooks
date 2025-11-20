@@ -1,3 +1,4 @@
+import type { Plugin } from '@opencode-ai/plugin';
 import {
   WebhookPluginConfig,
   WebhookConfig,
@@ -8,32 +9,8 @@ import {
 import { WebhookClient } from './webhook-client';
 
 /**
- * Opencode Webhook Plugin
- *
- * This plugin allows you to send webhook notifications on any Opencode event.
- * You can configure multiple webhooks for different events, customize payloads,
- * and add filtering logic.
- *
- * @example
- * ```typescript
- * import { createWebhookPlugin, OpencodeEventType } from '@opencode/webhook-plugin';
- *
- * const plugin = createWebhookPlugin({
- *   webhooks: [
- *     {
- *       url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL',
- *       events: [OpencodeEventType.SESSION_IDLE],
- *       transformPayload: (payload) => ({
- *         text: `Session ${payload.sessionId} is now idle`,
- *       }),
- *     },
- *   ],
- *   debug: true,
- * });
- *
- * // Register with Opencode
- * opencode.use(plugin);
- * ```
+ * Opencode Webhook Plugin Class
+ * Internal logic for handling webhooks
  */
 export class WebhookPlugin {
   private config: WebhookPluginConfig;
@@ -45,7 +22,6 @@ export class WebhookPlugin {
     this.client = new WebhookClient(config.debug);
     this.eventHandlers = new Map();
 
-    // Index webhooks by event type for efficient lookup
     this.indexWebhooks();
 
     if (this.config.debug) {
@@ -56,9 +32,6 @@ export class WebhookPlugin {
     }
   }
 
-  /**
-   * Index webhooks by event type for efficient event handling
-   */
   private indexWebhooks(): void {
     for (const webhook of this.config.webhooks) {
       for (const eventType of webhook.events) {
@@ -70,32 +43,20 @@ export class WebhookPlugin {
     }
   }
 
-  /**
-   * Get all registered event types
-   */
   private getRegisteredEvents(): string[] {
     return Array.from(this.eventHandlers.keys());
   }
 
-  /**
-   * Handle an Opencode event
-   * This is the main entry point called by Opencode when an event occurs
-   */
   async handleEvent(
     eventType: OpencodeEventType,
     payload: Partial<BaseEventPayload>
   ): Promise<WebhookResult[]> {
-    // Get webhooks registered for this event
     const webhooks = this.eventHandlers.get(eventType);
 
     if (!webhooks || webhooks.size === 0) {
-      if (this.config.debug) {
-        console.log(`[WebhookPlugin] No webhooks registered for event: ${eventType}`);
-      }
       return [];
     }
 
-    // Prepare the full payload
     const fullPayload: BaseEventPayload = {
       timestamp: new Date().toISOString(),
       eventType,
@@ -106,14 +67,12 @@ export class WebhookPlugin {
       console.log(`[WebhookPlugin] Handling event: ${eventType}`, fullPayload);
     }
 
-    // Send webhooks in parallel
     const webhookPromises = Array.from(webhooks).map((webhook) =>
       this.sendWebhook(webhook, fullPayload)
     );
 
     const results = await Promise.allSettled(webhookPromises);
 
-    // Extract results
     return results.map((result) => {
       if (result.status === 'fulfilled') {
         return result.value;
@@ -128,14 +87,10 @@ export class WebhookPlugin {
     });
   }
 
-  /**
-   * Send a single webhook
-   */
   private async sendWebhook(
     webhook: WebhookConfig,
     payload: BaseEventPayload
   ): Promise<WebhookResult> {
-    // Check if webhook should be sent based on filter function
     if (webhook.shouldSend && !webhook.shouldSend(payload)) {
       if (this.config.debug) {
         console.log(
@@ -149,7 +104,6 @@ export class WebhookPlugin {
       };
     }
 
-    // Apply global defaults if not specified in webhook config
     const webhookWithDefaults: WebhookConfig = {
       ...webhook,
       timeoutMs: webhook.timeoutMs ?? this.config.defaultTimeoutMs,
@@ -162,31 +116,23 @@ export class WebhookPlugin {
 
     return this.client.send(webhookWithDefaults, payload);
   }
-
-  /**
-   * Register event listeners with Opencode
-   * This method should be called by Opencode's plugin system
-   */
-  register(eventEmitter: any): void {
-    for (const eventType of this.eventHandlers.keys()) {
-      eventEmitter.on(eventType, (payload: Partial<BaseEventPayload>) => {
-        this.handleEvent(eventType, payload).catch((error) => {
-          console.error('[WebhookPlugin] Error handling event:', error);
-        });
-      });
-    }
-
-    if (this.config.debug) {
-      console.log('[WebhookPlugin] Event listeners registered');
-    }
-  }
 }
 
 /**
- * Factory function to create a webhook plugin instance
+ * Factory function to create a webhook plugin instance compatible with Opencode
  */
-export function createWebhookPlugin(config: WebhookPluginConfig): WebhookPlugin {
-  return new WebhookPlugin(config);
+export function createWebhookPlugin(config: WebhookPluginConfig): Plugin {
+  const plugin = new WebhookPlugin(config);
+  
+  return async (_context) => {
+    return {
+      event: async ({ event }: { event: any }) => {
+        // Map the incoming event to our handler
+        // event.type corresponds to OpencodeEventType values (e.g. 'session.idle')
+        await plugin.handleEvent(event.type as OpencodeEventType, event);
+      }
+    };
+  };
 }
 
 // Export types for consumers

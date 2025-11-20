@@ -4,33 +4,45 @@
  */
 export enum OpencodeEventType {
   // Session events
-  SESSION_START = 'session:start',
-  SESSION_END = 'session:end',
-  SESSION_IDLE = 'session:idle',
-  SESSION_ACTIVE = 'session:active',
+  SESSION_CREATED = 'session.created',
+  SESSION_UPDATED = 'session.updated',
+  SESSION_IDLE = 'session.idle',
+  SESSION_ERROR = 'session.error',
+  SESSION_DELETED = 'session.deleted',
+  SESSION_COMPACTED = 'session.compacted',
+  SESSION_STATUS = 'session.status',
+  SESSION_DIFF = 'session.diff',
 
-  // Code events
-  CODE_CHANGE = 'code:change',
-  CODE_SAVE = 'code:save',
-  CODE_EXECUTE = 'code:execute',
+  // Tool events
+  TOOL_EXECUTE_BEFORE = 'tool.execute.before',
+  TOOL_EXECUTE_AFTER = 'tool.execute.after',
 
-  // Error events
-  ERROR_OCCURRED = 'error:occurred',
-  ERROR_RESOLVED = 'error:resolved',
+  // Message events
+  MESSAGE_UPDATED = 'message.updated',
+  MESSAGE_REMOVED = 'message.removed',
+  MESSAGE_PART_UPDATED = 'message.part.updated',
+  MESSAGE_PART_REMOVED = 'message.part.removed',
 
-  // Build events
-  BUILD_START = 'build:start',
-  BUILD_SUCCESS = 'build:success',
-  BUILD_FAILED = 'build:failed',
+  // File events
+  FILE_EDITED = 'file.edited',
+  FILE_WATCHER_UPDATED = 'file.watcher.updated',
 
-  // Test events
-  TEST_START = 'test:start',
-  TEST_SUCCESS = 'test:success',
-  TEST_FAILED = 'test:failed',
+  // Command events
+  COMMAND_EXECUTED = 'command.executed',
 
-  // User events
-  USER_ACTION = 'user:action',
-  USER_INPUT = 'user:input',
+  // LSP events
+  LSP_UPDATED = 'lsp.updated',
+  LSP_CLIENT_DIAGNOSTICS = 'lsp.client.diagnostics',
+
+  // Other events
+  INSTALLATION_UPDATED = 'installation.updated',
+  PERMISSION_UPDATED = 'permission.updated',
+  PERMISSION_REPLIED = 'permission.replied',
+  SERVER_CONNECTED = 'server.connected',
+  TODO_UPDATED = 'todo.updated',
+  TUI_PROMPT_APPEND = 'tui.prompt.append',
+  TUI_COMMAND_EXECUTE = 'tui.command.execute',
+  TUI_TOAST_SHOW = 'tui.toast.show',
 }
 
 /**

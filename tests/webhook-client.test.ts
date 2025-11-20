@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
-import { WebhookClient } from '../src/webhook-client';
-import { WebhookConfig, BaseEventPayload, OpencodeEventType } from '../src/types';
+import { WebhookClient } from '../src/webhook-client.js';
+import { WebhookConfig, BaseEventPayload, OpencodeEventType } from '../src/types.js';
 
 // Mock axios
 jest.mock('axios');

@@ -4,7 +4,7 @@
  */
 
 import axios from 'axios';
-import { createWebhookPlugin } from '../src/index';
+import { WebhookPlugin } from '../src/index';
 import { OpencodeEventType, BaseEventPayload } from '../src/types';
 
 jest.mock('axios');
@@ -29,7 +29,7 @@ describe('Webhook Plugin Integration Tests', () => {
         data: { ok: true },
       } as any);
 
-      const plugin = createWebhookPlugin({
+      const plugin = new WebhookPlugin({
         webhooks: [
           {
             url: 'https://hooks.slack.com/services/TEST/WEBHOOK/URL',
@@ -84,25 +84,25 @@ describe('Webhook Plugin Integration Tests', () => {
         data: { success: true },
       } as any);
 
-      const plugin = createWebhookPlugin({
+      const plugin = new WebhookPlugin({
         webhooks: [
           {
             url: 'https://slack.com/webhook',
-            events: [OpencodeEventType.BUILD_FAILED],
+            events: [OpencodeEventType.SESSION_ERROR],
             transformPayload: (payload) => ({
               text: `Build failed: ${payload.error}`,
             }),
           },
           {
             url: 'https://discord.com/webhook',
-            events: [OpencodeEventType.BUILD_FAILED],
+            events: [OpencodeEventType.SESSION_ERROR],
             transformPayload: (payload) => ({
               content: `Build error: ${payload.error}`,
             }),
           },
           {
             url: 'https://teams.microsoft.com/webhook',
-            events: [OpencodeEventType.BUILD_FAILED],
+            events: [OpencodeEventType.SESSION_ERROR],
             transformPayload: (payload) => ({
               title: 'Build Failed',
               text: payload.error,
@@ -118,7 +118,7 @@ describe('Webhook Plugin Integration Tests', () => {
 
       const startTime = Date.now();
       const results = await plugin.handleEvent(
-        OpencodeEventType.BUILD_FAILED,
+        OpencodeEventType.SESSION_ERROR,
         payload
       );
       const duration = Date.now() - startTime;
@@ -139,11 +139,11 @@ describe('Webhook Plugin Integration Tests', () => {
         data: { success: true },
       } as any);
 
-      const plugin = createWebhookPlugin({
+      const plugin = new WebhookPlugin({
         webhooks: [
           {
             url: 'https://hooks.slack.com/critical',
-            events: [OpencodeEventType.ERROR_OCCURRED],
+            events: [OpencodeEventType.SESSION_ERROR],
             shouldSend: (payload) => {
               const error = (payload as any).error || '';
               return error.toLowerCase().includes('critical');
@@ -154,7 +154,7 @@ describe('Webhook Plugin Integration Tests', () => {
           },
           {
             url: 'https://hooks.slack.com/all-errors',
-            events: [OpencodeEventType.ERROR_OCCURRED],
+            events: [OpencodeEventType.SESSION_ERROR],
             transformPayload: (payload) => ({
               text: `Error: ${payload.error}`,
             }),
@@ -168,7 +168,7 @@ describe('Webhook Plugin Integration Tests', () => {
       };
 
       let results = await plugin.handleEvent(
-        OpencodeEventType.ERROR_OCCURRED,
+        OpencodeEventType.SESSION_ERROR,
         criticalPayload
       );
 
@@ -185,7 +185,7 @@ describe('Webhook Plugin Integration Tests', () => {
       };
 
       results = await plugin.handleEvent(
-        OpencodeEventType.ERROR_OCCURRED,
+        OpencodeEventType.SESSION_ERROR,
         normalPayload
       );
 
@@ -201,25 +201,25 @@ describe('Webhook Plugin Integration Tests', () => {
         .mockRejectedValueOnce(new Error('Network timeout'))
         .mockResolvedValueOnce({ status: 200, data: { success: true } } as any);
 
-      const plugin = createWebhookPlugin({
+      const plugin = new WebhookPlugin({
         webhooks: [
           {
             url: 'https://webhook1.com',
-            events: [OpencodeEventType.SESSION_START],
+            events: [OpencodeEventType.SESSION_CREATED],
           },
           {
             url: 'https://webhook2.com',
-            events: [OpencodeEventType.SESSION_START],
+            events: [OpencodeEventType.SESSION_CREATED],
             retry: { maxAttempts: 1 }, // Fail immediately
           },
           {
             url: 'https://webhook3.com',
-            events: [OpencodeEventType.SESSION_START],
+            events: [OpencodeEventType.SESSION_CREATED],
           },
         ],
       });
 
-      const results = await plugin.handleEvent(OpencodeEventType.SESSION_START, {
+      const results = await plugin.handleEvent(OpencodeEventType.SESSION_CREATED, {
         sessionId: 'test',
       });
 
@@ -236,39 +236,24 @@ describe('Webhook Plugin Integration Tests', () => {
         data: { success: true },
       } as any);
 
-      const plugin = createWebhookPlugin({
+      const plugin = new WebhookPlugin({
         webhooks: [
           {
             url: 'https://example.com/webhook',
             events: [
               OpencodeEventType.SESSION_IDLE,
-              OpencodeEventType.SESSION_START,
+              OpencodeEventType.SESSION_CREATED,
             ],
           },
         ],
       });
 
-      // Mock event emitter
-      const eventHandlers: Map<string, (payload: any) => Promise<void>> = new Map();
-      const mockEmitter = {
-        on: jest.fn((event: string, handler: (payload: any) => Promise<void>) => {
-          eventHandlers.set(event, handler);
-        }),
-        emit: async (event: string, payload: any) => {
-          const handler = eventHandlers.get(event);
-          if (handler) {
-            await handler(payload);
-          }
-        },
-      };
-
-      plugin.register(mockEmitter);
-
-      // Simulate events
-      await mockEmitter.emit(OpencodeEventType.SESSION_START, {
+      // Mock event emitter is no longer supported in the same way with the new plugin system
+      // but we can verify direct calls work
+      await plugin.handleEvent(OpencodeEventType.SESSION_CREATED, {
         sessionId: 'session-1',
       });
-      await mockEmitter.emit(OpencodeEventType.SESSION_IDLE, {
+      await plugin.handleEvent(OpencodeEventType.SESSION_IDLE, {
         sessionId: 'session-1',
       });
 
@@ -283,11 +268,11 @@ describe('Webhook Plugin Integration Tests', () => {
         data: { success: true },
       } as any);
 
-      const plugin = createWebhookPlugin({
+      const plugin = new WebhookPlugin({
         webhooks: [
           {
             url: 'https://example.com/webhook',
-            events: [OpencodeEventType.CODE_CHANGE],
+            events: [OpencodeEventType.FILE_EDITED],
           },
         ],
       });
@@ -296,7 +281,7 @@ describe('Webhook Plugin Integration Tests', () => {
       const promises = [];
       for (let i = 0; i < 10; i++) {
         promises.push(
-          plugin.handleEvent(OpencodeEventType.CODE_CHANGE, {
+          plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
             sessionId: 'session-1',
             changeId: i,
           })
@@ -316,11 +301,11 @@ describe('Webhook Plugin Integration Tests', () => {
         data: { success: true },
       } as any);
 
-      const plugin = createWebhookPlugin({
+      const plugin = new WebhookPlugin({
         webhooks: [
           {
             url: 'https://example.com/webhook',
-            events: [OpencodeEventType.TEST_FAILED],
+            events: [OpencodeEventType.SESSION_ERROR],
             transformPayload: (payload) => {
               const tests = (payload as any).tests || [];
               return {
@@ -345,7 +330,7 @@ describe('Webhook Plugin Integration Tests', () => {
         ],
       });
 
-      await plugin.handleEvent(OpencodeEventType.TEST_FAILED, {
+      await plugin.handleEvent(OpencodeEventType.SESSION_ERROR, {
         sessionId: 'session-1',
         tests: [
           { name: 'test1', passed: true },
