@@ -47,15 +47,18 @@ jobs:
 
       - name: Run tests
         run: npm test
+        if: matrix.node-version != 20
 
-      - name: Generate coverage report
+      - name: Run tests with coverage
         run: npm run test:coverage
+        if: matrix.node-version == 20
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         if: matrix.node-version == 20
         with:
-          file: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
