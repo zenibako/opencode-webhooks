@@ -4,7 +4,6 @@ import {
   OpencodeEventType,
   WebhookPluginConfig,
   BaseEventPayload,
-  WebhookResult,
 } from '../src/types';
 
 // Mock WebhookClient
@@ -467,7 +466,7 @@ describe('WebhookPlugin', () => {
             url: 'https://example.com/webhook',
             events: [OpencodeEventType.SESSION_IDLE],
             transformPayload: (payload) => ({ custom: payload }),
-            shouldSend: (payload) => true,
+            shouldSend: (_payload) => true,
             headers: { 'Authorization': 'Bearer token' },
             retry: { maxAttempts: 3, delayMs: 1000 },
             timeoutMs: 5000,

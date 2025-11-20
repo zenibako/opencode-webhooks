@@ -1,5 +1,9 @@
 # Opencode Webhook Plugin
 
+[![CI](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://badge.fury.io/js/@opencode%2Fwebhook-plugin.svg)](https://badge.fury.io/js/@opencode%2Fwebhook-plugin)
+
 A powerful TypeScript plugin for Opencode that enables sending webhook notifications on any Opencode event. Perfect for integrating with Slack, Discord, Microsoft Teams, or any custom webhook endpoint.
 
 ## Features
@@ -413,6 +417,59 @@ import {
   SlackMessage,
 } from '@opencode/webhook-plugin';
 ```
+
+## Development
+
+### Setup
+
+```bash
+# Install dependencies
+npm install
+
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run linter
+npm run lint
+
+# Fix linting issues
+npm run lint:fix
+
+# Build the project
+npm run build
+
+# Watch mode for development
+npm run watch
+```
+
+### GitHub Actions CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+- **CI Workflow** - Runs on push and pull requests
+  - Lints code with ESLint
+  - Runs tests on Node.js 18 and 20
+  - Builds TypeScript
+  - Reports test coverage
+
+- **PR Checks** - Additional validation for pull requests
+  - Type checking
+  - Bundle size analysis
+  - Coverage reporting
+
+- **Release Workflow** - Automated publishing
+  - Publishes to npm on GitHub releases
+  - Creates release artifacts
+
+### Code Quality
+
+- **98% test coverage** - Comprehensive unit and integration tests
+- **ESLint** - Strict TypeScript linting rules
+- **TypeScript** - Full type safety
+- **Jest** - Modern testing framework
 
 ## License
 

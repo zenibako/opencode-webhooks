@@ -249,9 +249,9 @@ describe('Webhook Plugin Integration Tests', () => {
       });
 
       // Mock event emitter
-      const eventHandlers: Map<string, Function> = new Map();
+      const eventHandlers: Map<string, (payload: any) => Promise<void>> = new Map();
       const mockEmitter = {
-        on: jest.fn((event: string, handler: Function) => {
+        on: jest.fn((event: string, handler: (payload: any) => Promise<void>) => {
           eventHandlers.set(event, handler);
         }),
         emit: async (event: string, payload: any) => {
