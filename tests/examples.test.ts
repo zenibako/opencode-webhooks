@@ -3,22 +3,26 @@
  * Ensures that all example files can be loaded without crashing
  */
 
+import * as slackIdleNotification from '../examples/slack-idle-notification';
+import * as simpleWebhook from '../examples/simple-webhook';
+import * as advancedUsage from '../examples/advanced-usage';
+import * as integrationExample from '../examples/integration-example';
+
 describe('Example Files', () => {
   describe('slack-idle-notification.ts', () => {
     it('should load without crashing', () => {
       expect(() => {
-        require('../examples/slack-idle-notification');
+        void slackIdleNotification;
       }).not.toThrow();
     });
 
     it('should export webhookPlugin', () => {
-      const module = require('../examples/slack-idle-notification');
-      expect(module.webhookPlugin).toBeDefined();
-      expect(typeof module.webhookPlugin).toBe('object');
+      expect(slackIdleNotification.webhookPlugin).toBeDefined();
+      expect(typeof slackIdleNotification.webhookPlugin).toBe('object');
     });
 
     it('should create a valid webhook plugin configuration', () => {
-      const { webhookPlugin } = require('../examples/slack-idle-notification');
+      const { webhookPlugin } = slackIdleNotification;
       
       // Verify it has the register method (plugin interface)
       expect(typeof webhookPlugin.register).toBe('function');
@@ -31,39 +35,36 @@ describe('Example Files', () => {
   describe('simple-webhook.ts', () => {
     it('should load without crashing', () => {
       expect(() => {
-        require('../examples/simple-webhook');
+        void simpleWebhook;
       }).not.toThrow();
     });
 
     it('should export webhookPlugin', () => {
-      const module = require('../examples/simple-webhook');
-      expect(module.webhookPlugin).toBeDefined();
+      expect(simpleWebhook.webhookPlugin).toBeDefined();
     });
   });
 
   describe('advanced-usage.ts', () => {
     it('should load without crashing', () => {
       expect(() => {
-        require('../examples/advanced-usage');
+        void advancedUsage;
       }).not.toThrow();
     });
 
     it('should export webhookPlugin', () => {
-      const module = require('../examples/advanced-usage');
-      expect(module.webhookPlugin).toBeDefined();
+      expect(advancedUsage.webhookPlugin).toBeDefined();
     });
   });
 
   describe('integration-example.ts', () => {
     it('should load without crashing', () => {
       expect(() => {
-        require('../examples/integration-example');
+        void integrationExample;
       }).not.toThrow();
     });
 
     it('should export webhookPlugin', () => {
-      const module = require('../examples/integration-example');
-      expect(module.webhookPlugin).toBeDefined();
+      expect(integrationExample.webhookPlugin).toBeDefined();
     });
   });
 
@@ -71,10 +72,10 @@ describe('Example Files', () => {
     it('should all load successfully', () => {
       // Load all examples
       const examples = [
-        require('../examples/slack-idle-notification'),
-        require('../examples/simple-webhook'),
-        require('../examples/advanced-usage'),
-        require('../examples/integration-example'),
+        slackIdleNotification,
+        simpleWebhook,
+        advancedUsage,
+        integrationExample,
       ];
 
       // Verify that all examples load successfully
