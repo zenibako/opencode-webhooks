@@ -19,73 +19,82 @@ A powerful TypeScript plugin for Opencode that enables sending webhook notificat
 
 ## Installation
 
-### For Use with Opencode
+### Quick Install (Recommended)
 
-To use this plugin with Opencode, install the example files directly into your Opencode plugins directory:
-
-```bash
-# Navigate to your Opencode plugins directory
-cd ~/.opencode/plugins
-
-# Clone or download the example you want to use
-curl -O https://raw.githubusercontent.com/yourusername/opencode-webhooks/main/examples/slack-idle-notification.ts
-
-# Or copy any of the example files:
-# - slack-idle-notification.ts - Send Slack notifications when sessions go idle
-# - simple-webhook.ts - Basic webhook configuration
-# - advanced-usage.ts - Multiple webhooks with advanced features
-# - integration-example.ts - Full integration example
-```
-
-### For NPM Installation
-
-If you prefer to install as an npm package:
+Install the plugin directly into your Opencode plugins directory with a single command:
 
 ```bash
-npm install opencode-webhooks
-```
+# Clone this repository
+git clone https://github.com/yourusername/opencode-webhooks.git
+cd opencode-webhooks
 
-### For Local Development
-
-If you're developing the plugin locally:
-
-```bash
+# Install dependencies
 npm install
-npm run build
+
+# Install the plugin with your webhook URL
+npm run install-plugin -- https://your-webhook-url
+
+# For Slack formatting (recommended for Slack webhooks)
+npm run install-plugin -- https://hooks.slack.com/services/YOUR/WEBHOOK/URL --slack
+
+# Enable debug logging
+npm run install-plugin -- https://your-webhook-url --debug
 ```
 
-## Quick Start with Opencode
+This will automatically:
+- Bundle all source code into a single standalone file
+- Install it to `~/.opencode/plugins/webhook.js`
+- Configure it to send notifications on session idle events
+- No manual file editing required!
+
+**Next step:** Restart Opencode to activate the plugin.
+
+### Options
+
+The install script supports the following options:
+
+- `--slack` - Use Slack-formatted messages with rich formatting
+- `--debug` - Enable debug logging for troubleshooting
+- `--help` - Show usage information
+
+### Manual Installation
+
+If you prefer to manually configure the plugin:
 
 1. **Copy an example file to your Opencode plugins directory:**
 
 ```bash
-# Create the plugins directory if it doesn't exist
 mkdir -p ~/.opencode/plugins
-
-# Download the Slack idle notification example
-curl -o ~/.opencode/plugins/slack-webhook.ts \
+curl -o ~/.opencode/plugins/webhook.js \
   https://raw.githubusercontent.com/yourusername/opencode-webhooks/main/examples/slack-idle-notification.ts
 ```
 
 2. **Edit the file to add your webhook URL:**
 
 ```bash
-# Edit the file to replace YOUR/WEBHOOK/URL with your actual Slack webhook URL
-nano ~/.opencode/plugins/slack-webhook.ts
+nano ~/.opencode/plugins/webhook.js
+# Replace YOUR/WEBHOOK/URL with your actual webhook URL
 ```
 
-3. **Restart Opencode** - The plugin will be automatically loaded!
+3. **Restart Opencode**
 
-### Available Examples
+### For NPM Installation (Library Use)
 
-All examples can be installed directly as Opencode plugins:
+If you want to use this as a library in your own projects:
 
-- **`slack-idle-notification.ts`** - Sends formatted Slack messages when your Opencode session goes idle
-- **`simple-webhook.ts`** - Basic webhook configuration for session events  
-- **`advanced-usage.ts`** - Multiple webhooks for different events (Slack, Discord, Teams, custom endpoints)
-- **`integration-example.ts`** - Complete integration example showing how to use with Opencode
+```bash
+npm install opencode-webhooks
+```
 
-You can view all examples in the [examples directory](./examples/).
+### For Development
+
+If you're developing the plugin locally:
+
+```bash
+npm install
+npm run build
+npm run watch  # For development mode
+```
 
 ## Quick Start
 
