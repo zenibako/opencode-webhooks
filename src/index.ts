@@ -35,10 +35,10 @@ export class WebhookPlugin {
   private indexWebhooks(): void {
     for (const webhook of this.config.webhooks) {
       for (const eventType of webhook.events) {
-        if (!this.eventHandlers.has(eventType)) {
-          this.eventHandlers.set(eventType, new Set());
+        if (!this.eventHandlers.has(eventType as OpencodeEventType)) {
+          this.eventHandlers.set(eventType as OpencodeEventType, new Set());
         }
-        this.eventHandlers.get(eventType)!.add(webhook);
+        this.eventHandlers.get(eventType as OpencodeEventType)!.add(webhook);
       }
     }
   }
