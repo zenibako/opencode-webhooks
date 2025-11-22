@@ -1,6 +1,6 @@
 # OpenCode Webhooks
 
-[![CI](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml)
+[![CI](https://github.com/zenibako/opencode-webhooks/actions/workflows/ci.yml/badge.svg)](https://github.com/zenibako/opencode-webhooks/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/opencode-webhooks.svg)](https://badge.fury.io/js/opencode-webhooks)
 
