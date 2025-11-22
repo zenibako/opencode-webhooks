@@ -55,6 +55,8 @@ export default createWebhookPlugin({
         'session.deleted',
         'session.error',
         'session.resumed',
+        'message.updated',
+        'message.part.updated',
         'file.edited',
         'command.executed',
       ],
@@ -68,6 +70,8 @@ export default createWebhookPlugin({
           'session.deleted': 'Session Ended',
           'session.error': 'Error Occurred',
           'session.resumed': 'Session Resumed',
+          'message.updated': 'Message Updated',
+          'message.part.updated': 'Message Part Updated',
           'file.edited': 'File Edited',
           'command.executed': 'Command Executed',
         };
@@ -75,10 +79,19 @@ export default createWebhookPlugin({
         // Determine severity for conditional automations
         const severity = payload.eventType === 'session.error' ? 'error' : 'info';
         
+        // Extract message content if available
+        const messageContent = payload.content || payload.text || payload.message || '';
+        
         // Create a notification-friendly message
         let notificationMessage = `OpenCode: ${eventLabels[payload.eventType] || payload.eventType}`;
         if (payload.error) {
           notificationMessage += ` - ${payload.error}`;
+        }
+        
+        // Add message preview for message events
+        if (messageContent && (payload.eventType === 'message.updated' || payload.eventType === 'message.part.updated')) {
+          const preview = messageContent.substring(0, 100);
+          notificationMessage = preview + (messageContent.length > 100 ? '...' : '');
         }
 
         // Return formatted payload for Home Assistant
@@ -89,6 +102,7 @@ export default createWebhookPlugin({
           session_id: payload.sessionId || 'unknown',
           timestamp: payload.timestamp,
           notification_message: notificationMessage,
+          messageContent: messageContent || null,
           // Include original payload for advanced automations
           raw_payload: payload,
         };

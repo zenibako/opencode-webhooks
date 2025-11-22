@@ -33,7 +33,18 @@ export default createWebhookPlugin({
         'session.deleted',
         'session.error',
         'session.resumed',
+        'message.updated',
+        'message.part.updated',
       ],
+      
+      // Optional: Extract message content
+      transformPayload: (payload) => {
+        const messageContent = payload.content || payload.text || payload.message;
+        return {
+          ...payload,
+          messageContent: messageContent || null,
+        };
+      },
     },
   ],
   debug: true,

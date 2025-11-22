@@ -42,6 +42,8 @@ export default createWebhookPlugin({
         'session.deleted',
         'session.error',
         'session.resumed',
+        'message.updated',
+        'message.part.updated',
       ],
       
       // Transform for Slack Workflow Builder
@@ -52,6 +54,8 @@ export default createWebhookPlugin({
           'session.deleted': '🗑️',
           'session.error': '❌',
           'session.resumed': '▶️',
+          'message.updated': '💬',
+          'message.part.updated': '✏️',
         };
 
         const eventDescriptions: Record<string, string> = {
@@ -60,11 +64,17 @@ export default createWebhookPlugin({
           'session.deleted': 'An OpenCode session has been deleted',
           'session.error': 'An error occurred in the OpenCode session',
           'session.resumed': 'The OpenCode session has resumed activity',
+          'message.updated': 'A message has been updated',
+          'message.part.updated': 'Part of a message has been updated',
         };
 
         const emoji = eventEmojis[payload.eventType] || '📢';
         const description = eventDescriptions[payload.eventType] || 'OpenCode event triggered';
         const availableKeys = Object.keys(payload);
+        
+        // Extract message content if available
+        const messageContent = payload.content || payload.text || payload.message || '';
+        const messagePreview = messageContent ? `\n\nMessage: ${messageContent.substring(0, 100)}${messageContent.length > 100 ? '...' : ''}` : '';
         
         // Flatten payload to top level for Slack Workflow Builder
         return {
@@ -72,7 +82,8 @@ export default createWebhookPlugin({
           sessionId: payload.sessionId || 'N/A',
           timestamp: payload.timestamp,
           message: `${emoji} ${payload.eventType}`,
-          eventInfo: `${description}\n\nAvailable data: ${availableKeys.join(', ')}`,
+          eventInfo: `${description}${messagePreview}\n\nAvailable data: ${availableKeys.join(', ')}`,
+          messageContent: messageContent,
           ...payload,
         };
       },

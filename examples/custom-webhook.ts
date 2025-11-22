@@ -34,15 +34,23 @@ export default createWebhookPlugin({
         'session.deleted',
         'session.error',
         'session.resumed',
+        'message.updated',
+        'message.part.updated',
       ],
       
       // Optional: Transform the payload before sending
-      // transformPayload: (payload) => {
-      //   return {
-      //     ...payload,
-      //     customField: 'custom value',
-      //   };
-      // },
+      transformPayload: (payload) => {
+        // Extract message content if available
+        const messageContent = payload.content || payload.text || payload.message;
+        
+        return {
+          ...payload,
+          // Add a cleaned/extracted message field
+          messageContent: messageContent || null,
+          // Add custom metadata
+          customField: 'custom value',
+        };
+      },
       
       // Optional: Filter events
       // shouldSend: (payload) => {
