@@ -21,7 +21,7 @@ A powerful TypeScript plugin for Opencode that enables sending webhook notificat
 
 ### Quick Install (Recommended)
 
-Install the plugin directly into your Opencode plugins directory with a single command:
+Install the plugin directly into your Opencode plugins directory:
 
 ```bash
 # Clone this repository
@@ -31,50 +31,53 @@ cd opencode-webhooks
 # Install dependencies
 npm install
 
-# Install the plugin with your webhook URL
-npm run install-plugin -- https://your-webhook-url
+# Run the interactive installer
+npm run install-plugin
 
-# For Slack formatting (recommended for Slack webhooks)
-npm run install-plugin -- https://hooks.slack.com/services/YOUR/WEBHOOK/URL --slack
+# Or use non-interactive mode
+npm run install-plugin -- --url https://your-webhook-url
+
+# For Slack Workflow Builder integration
+npm run install-plugin -- --url https://hooks.slack.com/workflows/T123/A456/789/abc --slack
 
 # Enable debug logging
-npm run install-plugin -- https://your-webhook-url --debug
+npm run install-plugin -- --url https://your-webhook-url --debug
 ```
 
-This will automatically:
+The interactive installer will:
+- Guide you through choosing between Slack and custom webhooks
+- Provide setup instructions for Slack Workflow Builder
 - Bundle all source code into a single standalone file
-- Install it to `~/.opencode/plugins/webhook.js`
-- Configure it to send notifications on session idle events
-- No manual file editing required!
+- Install it to `~/.config/opencode/plugin/webhook.js`
+- Configure it to send notifications on all session events
 
 **Next step:** Restart Opencode to activate the plugin.
 
-### Options
+### CLI Options
 
-The install script supports the following options:
+```bash
+opencode-webhooks install [OPTIONS]
 
-- `--slack` - Use Slack-formatted messages with rich formatting
-- `--debug` - Enable debug logging for troubleshooting
-- `--help` - Show usage information
+Options:
+  -u, --url <url>        Webhook URL (skips interactive prompts)
+  -s, --slack            Use Slack message formatting
+  -d, --debug            Enable debug logging
+  -o, --output <path>    Custom output path for the plugin file
+  --help                 Show help
+```
 
 ### Manual Installation
 
-If you prefer to manually configure the plugin:
+If you prefer to manually configure the plugin, you can create a custom configuration:
 
-1. **Copy an example file to your Opencode plugins directory:**
-
-```bash
-mkdir -p ~/.opencode/plugins
-curl -o ~/.opencode/plugins/webhook.js \
-  https://raw.githubusercontent.com/yourusername/opencode-webhooks/main/examples/slack-idle-notification.ts
-```
-
-2. **Edit the file to add your webhook URL:**
+1. **Build the library:**
 
 ```bash
-nano ~/.opencode/plugins/webhook.js
-# Replace YOUR/WEBHOOK/URL with your actual webhook URL
+npm install
+npm run build
 ```
+
+2. **Create your own plugin file** at `~/.opencode/plugins/webhook.js` using the library
 
 3. **Restart Opencode**
 
@@ -434,12 +437,13 @@ npm run build
 npm run watch
 ```
 
-### Running Examples
+### Usage Examples
 
-See the `examples/` directory for complete examples:
+The interactive installer (`npm run install-plugin`) provides ready-to-use configurations for:
 
-- `slack-idle-notification.ts` - Basic Slack notification on idle sessions
-- `advanced-usage.ts` - Multiple webhooks with advanced features
+- Slack notifications via Workflow Builder
+- Custom webhook endpoints
+- Debug mode for troubleshooting
 
 ## Debugging
 
@@ -467,6 +471,202 @@ The plugin includes robust error handling:
 - Timeout protection
 - Detailed error messages
 - Non-blocking: webhook failures don't affect Opencode operation
+
+## HTTP Request Format
+
+When a webhook is triggered, the plugin sends an HTTP request to your endpoint with the following properties:
+
+### Request Headers
+
+```
+Content-Type: application/json
+User-Agent: Opencode-Webhook-Plugin/1.0
+```
+
+Any custom headers you specify in the `headers` configuration will also be included.
+
+### Request Method
+
+By default, webhooks use `POST`, but you can configure `PUT` or `PATCH` via the `method` option.
+
+### Request Body
+
+The request body contains the event payload, which can be:
+
+1. **Default payload** - If no `transformPayload` function is provided, the raw event data is sent:
+
+```json
+{
+  "timestamp": "2025-11-22T10:30:00.000Z",
+  "eventType": "session.idle",
+  "sessionId": "abc123",
+  "userId": "user456",
+  // Additional event-specific properties...
+}
+```
+
+2. **Transformed payload** - If you provide a `transformPayload` function, the body will contain whatever your function returns:
+
+```typescript
+transformPayload: (payload) => ({
+  text: `Session ${payload.sessionId} is idle`,
+  timestamp: payload.timestamp,
+})
+```
+
+### Base Event Properties
+
+All event payloads include these base properties:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `timestamp` | `string` | ISO 8601 timestamp when the event occurred |
+| `eventType` | `OpencodeEventType` | The type of event (e.g., `"session.idle"`) |
+| `sessionId` | `string` (optional) | The current Opencode session ID |
+| `userId` | `string` (optional) | The user ID associated with the event |
+
+Additional properties vary by event type and are included in the payload object.
+
+### Inspecting Event-Specific Properties
+
+Each event type may include additional properties beyond the base properties. To discover what properties are available for each event:
+
+**Method 1: Enable Debug Mode**
+
+Enable debug logging to see the full payload structure in your console:
+
+```typescript
+const webhookPlugin = createWebhookPlugin({
+  webhooks: [
+    {
+      url: 'https://your-endpoint.com/webhook',
+      events: [OpencodeEventType.SESSION_IDLE],
+    },
+  ],
+  debug: true,  // This will log all event payloads
+});
+```
+
+When an event occurs, you'll see output like:
+```
+[WebhookPlugin] Handling event: session.idle {
+  timestamp: '2025-11-22T10:30:00.000Z',
+  eventType: 'session.idle',
+  sessionId: 'abc123',
+  userId: 'user456',
+  // ... additional event-specific properties
+}
+```
+
+**Method 2: Use a Logging Transform**
+
+Create a webhook with a transform function that logs the payload:
+
+```typescript
+{
+  url: 'https://your-endpoint.com/webhook',
+  events: [OpencodeEventType.SESSION_IDLE],
+  transformPayload: (payload) => {
+    console.log('Full event payload:', JSON.stringify(payload, null, 2));
+    return payload;
+  },
+}
+```
+
+**Method 3: Use a Webhook Inspector Service**
+
+Send events to a webhook inspection service to view the request body:
+
+- [webhook.site](https://webhook.site) - Free webhook inspection
+- [requestbin.com](https://requestbin.com) - Request inspection
+- [beeceptor.com](https://beeceptor.com) - API mocking and inspection
+
+```typescript
+{
+  url: 'https://webhook.site/your-unique-id',
+  events: [OpencodeEventType.SESSION_IDLE],
+  // Don't transform - send raw payload to see all properties
+}
+```
+
+**Method 4: TypeScript Type Exploration**
+
+The `BaseEventPayload` type includes an index signature that allows any additional properties:
+
+```typescript
+interface BaseEventPayload {
+  timestamp: string;
+  eventType: OpencodeEventType;
+  sessionId?: string;
+  userId?: string;
+  [key: string]: any;  // Additional event-specific properties
+}
+```
+
+Access properties safely in your transform function:
+
+```typescript
+transformPayload: (payload) => {
+  // Access any property - TypeScript won't error
+  const customProp = payload.customProperty;
+  
+  // Or log all properties
+  console.log('Available properties:', Object.keys(payload));
+  
+  return { /* transformed payload */ };
+}
+```
+
+**Example: Exploring a Session Idle Event**
+
+```typescript
+{
+  url: 'https://webhook.site/your-unique-id',
+  events: [OpencodeEventType.SESSION_IDLE],
+  transformPayload: (payload) => {
+    // Log all available properties
+    console.log('Property names:', Object.keys(payload));
+    console.log('Full payload:', payload);
+    
+    // Return payload with metadata for inspection
+    return {
+      ...payload,
+      inspectedAt: new Date().toISOString(),
+      propertyCount: Object.keys(payload).length,
+    };
+  },
+}
+```
+
+### Request Timeout
+
+The default request timeout is 10 seconds (10000ms). You can customize this per webhook:
+
+```typescript
+{
+  url: 'https://your-endpoint.com/webhook',
+  events: [OpencodeEventType.SESSION_IDLE],
+  timeoutMs: 5000,  // 5 second timeout
+}
+```
+
+### Example Raw Request
+
+Here's what a typical webhook request looks like:
+
+```http
+POST /webhook HTTP/1.1
+Host: hooks.slack.com
+Content-Type: application/json
+User-Agent: Opencode-Webhook-Plugin/1.0
+
+{
+  "timestamp": "2025-11-22T10:30:00.000Z",
+  "eventType": "session.idle",
+  "sessionId": "abc123",
+  "userId": "user456"
+}
+```
 
 ## Type Definitions
 

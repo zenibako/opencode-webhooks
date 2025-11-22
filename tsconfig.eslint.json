@@ -8,6 +8,6 @@
       "opencode-webhooks": ["./src/index.ts"]
     }
   },
-  "include": ["src/**/*", "tests/**/*", "examples/**/*", "jest.config.js"],
+  "include": ["src/**/*", "tests/**/*", "jest.config.js"],
   "exclude": ["node_modules", "dist", "coverage"]
 }
