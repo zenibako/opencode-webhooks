@@ -1,457 +1,320 @@
-# Opencode Webhook Plugin
+# OpenCode Webhooks
 
 [![CI](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml/badge.svg)](https://github.com/yourusername/opencode-webhooks/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/opencode-webhooks.svg)](https://badge.fury.io/js/opencode-webhooks)
 
-A powerful TypeScript plugin for Opencode that enables sending webhook notifications on any Opencode event. Perfect for integrating with Slack, Discord, Microsoft Teams, or any custom webhook endpoint.
+Send webhook notifications for any OpenCode event. Perfect for integrating with Slack, Discord, Microsoft Teams, or any custom webhook endpoint.
 
 ## Features
 
-- Send webhooks on any Opencode event (session, code, build, test, error events)
-- Multiple webhook configurations with different destinations
-- Custom payload transformations for each webhook
-- Filtering logic to control when webhooks are sent
-- Automatic retry logic with exponential backoff
-- TypeScript support with full type definitions
-- Debug logging for troubleshooting
-- Built-in support for popular platforms (Slack, Discord, Teams)
+- 🚀 **Zero build step** - Run directly with TypeScript via OpenCode's Bun runtime
+- 🔔 Send webhooks on any OpenCode event (session, tool, file, LSP events)
+- 🎯 Multiple webhook configurations with different destinations
+- 🔄 Custom payload transformations for each webhook
+- 🎛️ Filtering logic to control when webhooks are sent
+- ♻️ Automatic retry logic with exponential backoff
+- 📝 Full TypeScript support
+- 🐛 Debug logging for troubleshooting
+- 💬 Built-in Slack Workflow Builder integration
 
 ## Installation
 
-### Quick Install (Recommended)
-
-Install the plugin directly into your Opencode plugins directory:
+### Option 1: Install from NPM (Recommended)
 
 ```bash
-# Clone this repository
+# Install globally
+npm install -g opencode-webhooks
+
+# Copy an example to your plugins directory
+cp $(npm root -g)/opencode-webhooks/examples/slack-workflow.ts ~/.config/opencode/plugin/
+
+# Edit the file to add your webhook URL
+nano ~/.config/opencode/plugin/slack-workflow.ts
+
+# Restart OpenCode
+```
+
+### Option 2: Clone to Plugins Directory
+
+```bash
+# Clone directly into the plugins directory
+cd ~/.config/opencode/plugin
+git clone https://github.com/yourusername/opencode-webhooks.git
+
+# Copy an example to the plugin root
+cp opencode-webhooks/examples/local-dev.ts ./webhook.ts
+
+# Edit the file to add your webhook URL
+nano webhook.ts
+
+# Restart OpenCode
+```
+
+## Quick Start
+
+### Slack Workflow Builder Integration
+
+1. **Set up Slack Workflow:**
+   - Open Slack → Workflow Builder → Create workflow
+   - Choose **Webhook** as the trigger
+   - Add variables: `eventType`, `sessionId`, `timestamp`, `message`, `eventInfo`
+   - Add a "Send message" step using those variables
+   - Publish and copy the webhook URL
+   - [Full guide](https://slack.com/help/articles/360041352714)
+
+2. **Configure the plugin:**
+
+```typescript
+// ~/.config/opencode/plugin/slack-webhook.ts
+import { createWebhookPlugin } from 'opencode-webhooks';
+
+export default createWebhookPlugin({
+  webhooks: [
+    {
+      url: 'https://hooks.slack.com/workflows/T123/A456/789/abc',
+      events: ['session.created', 'session.idle', 'session.error'],
+      transformPayload: (payload) => ({
+        eventType: payload.eventType,
+        sessionId: payload.sessionId || 'N/A',
+        timestamp: payload.timestamp,
+        message: `🔔 ${payload.eventType}`,
+        eventInfo: `Event: ${payload.eventType}`,
+        ...payload,
+      }),
+    },
+  ],
+});
+```
+
+3. **Restart OpenCode** - The plugin will automatically load and start sending events!
+
+### Custom Webhook Endpoint
+
+```typescript
+// ~/.config/opencode/plugin/custom-webhook.ts
+import { createWebhookPlugin } from 'opencode-webhooks';
+
+export default createWebhookPlugin({
+  webhooks: [
+    {
+      url: 'https://your-endpoint.com/api/events',
+      events: ['session.created', 'session.error'],
+      headers: {
+        'Authorization': 'Bearer YOUR_TOKEN',
+      },
+    },
+  ],
+  debug: true,
+});
+```
+
+## Available Events
+
+```typescript
+// Session events
+'session.created'
+'session.updated'
+'session.idle'
+'session.error'
+'session.deleted'
+'session.compacted'
+'session.status'
+'session.diff'
+'session.resumed'
+
+// Tool events
+'tool.execute.before'
+'tool.execute.after'
+
+// Message events
+'message.updated'
+'message.removed'
+'message.part.updated'
+'message.part.removed'
+
+// File events
+'file.edited'
+'file.watcher.updated'
+
+// Command events
+'command.executed'
+
+// LSP events
+'lsp.updated'
+'lsp.client.diagnostics'
+
+// Other events
+'installation.updated'
+'permission.updated'
+'permission.replied'
+'server.connected'
+'todo.updated'
+'tui.prompt.append'
+'tui.command.execute'
+'tui.toast.show'
+```
+
+## Configuration
+
+### Basic Configuration
+
+```typescript
+import { createWebhookPlugin } from 'opencode-webhooks';
+
+export default createWebhookPlugin({
+  webhooks: [
+    {
+      url: 'https://your-webhook.com',
+      events: ['session.created'],
+    },
+  ],
+});
+```
+
+### Advanced Configuration
+
+```typescript
+import { createWebhookPlugin } from 'opencode-webhooks';
+
+export default createWebhookPlugin({
+  webhooks: [
+    {
+      // Webhook URL (required)
+      url: 'https://your-webhook.com',
+      
+      // Events to send (required)
+      events: ['session.created', 'session.error'],
+      
+      // HTTP method (optional, default: POST)
+      method: 'POST',
+      
+      // Custom headers (optional)
+      headers: {
+        'Authorization': 'Bearer TOKEN',
+        'X-Custom-Header': 'value',
+      },
+      
+      // Transform payload before sending (optional)
+      transformPayload: (payload) => ({
+        ...payload,
+        customField: 'value',
+      }),
+      
+      // Filter events (optional)
+      shouldSend: (payload) => {
+        // Only send errors from specific sessions
+        return payload.eventType === 'session.error';
+      },
+      
+      // Retry configuration (optional)
+      retry: {
+        maxAttempts: 3,
+        delayMs: 1000,
+      },
+      
+      // Request timeout (optional, default: 10000ms)
+      timeoutMs: 5000,
+    },
+  ],
+  
+  // Global debug mode (optional, default: false)
+  debug: true,
+  
+  // Global timeout (optional)
+  defaultTimeoutMs: 10000,
+  
+  // Global retry config (optional)
+  defaultRetry: {
+    maxAttempts: 3,
+    delayMs: 1000,
+  },
+});
+```
+
+## Examples
+
+The `examples/` directory contains ready-to-use configurations:
+
+- **[slack-workflow.ts](./examples/slack-workflow.ts)** - Slack Workflow Builder integration
+- **[custom-webhook.ts](./examples/custom-webhook.ts)** - Custom webhook endpoint
+- **[local-dev.ts](./examples/local-dev.ts)** - Local development setup
+
+Simply copy an example to `~/.config/opencode/plugin/`, edit the configuration, and restart OpenCode.
+
+## Event Payload
+
+All events include these base fields:
+
+```typescript
+{
+  timestamp: string;        // ISO 8601 timestamp
+  eventType: string;        // Event type (e.g., "session.created")
+  sessionId?: string;       // Session identifier (if applicable)
+  userId?: string;          // User identifier (if applicable)
+  // ... additional event-specific fields
+}
+```
+
+### Slack Workflow Builder Payload
+
+When using the Slack integration example, events are transformed to:
+
+```typescript
+{
+  eventType: "session.created",
+  sessionId: "abc123",
+  timestamp: "2025-11-22T12:00:00Z",
+  message: "🆕 session.created",
+  eventInfo: "A new OpenCode session has been created\n\nAvailable data: eventType, sessionId, timestamp",
+  // ... all original fields
+}
+```
+
+## Development
+
+```bash
+# Clone the repo
 git clone https://github.com/yourusername/opencode-webhooks.git
 cd opencode-webhooks
 
 # Install dependencies
 npm install
 
-# Run the interactive installer
-npm run install-plugin
+# Run tests
+npm test
 
-# Or use non-interactive mode
-npm run install-plugin -- --url https://your-webhook-url
+# Run tests in watch mode
+npm run test:watch
 
-# For Slack Workflow Builder integration
-npm run install-plugin -- --url https://hooks.slack.com/workflows/T123/A456/789/abc --slack
-
-# Enable debug logging
-npm run install-plugin -- --url https://your-webhook-url --debug
+# Lint
+npm run lint
+npm run lint:fix
 ```
 
-The interactive installer will:
-- Guide you through choosing between Slack and custom webhooks
-- Provide setup instructions for Slack Workflow Builder
-- Bundle all source code into a single standalone file
-- Install it to `~/.config/opencode/plugin/webhook.js`
-- Configure it to send notifications on all session events
+## TypeScript Support
 
-**Next step:** Restart Opencode to activate the plugin.
-
-### CLI Options
-
-```bash
-opencode-webhooks install [OPTIONS]
-
-Options:
-  -u, --url <url>        Webhook URL (skips interactive prompts)
-  -s, --slack            Use Slack message formatting
-  -d, --debug            Enable debug logging
-  -o, --output <path>    Custom output path for the plugin file
-  --help                 Show help
-```
-
-### Manual Installation
-
-If you prefer to manually configure the plugin, you can create a custom configuration:
-
-1. **Build the library:**
-
-```bash
-npm install
-npm run build
-```
-
-2. **Create your own plugin file** at `~/.opencode/plugins/webhook.js` using the library
-
-3. **Restart Opencode**
-
-### For NPM Installation (Library Use)
-
-If you want to use this as a library in your own projects:
-
-```bash
-npm install opencode-webhooks
-```
-
-### For Development
-
-If you're developing the plugin locally:
-
-```bash
-npm install
-npm run build
-npm run watch  # For development mode
-```
-
-## Quick Start
-
-### Basic Usage
+This package is written in TypeScript and provides full type definitions. OpenCode runs it directly via Bun without any build step.
 
 ```typescript
-import { createWebhookPlugin, OpencodeEventType } from 'opencode-webhooks';
+import { createWebhookPlugin, OpencodeEventType, BaseEventPayload } from 'opencode-webhooks';
 
-const webhookPlugin = createWebhookPlugin({
-  webhooks: [
-    {
-      url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL',
-      events: [OpencodeEventType.SESSION_IDLE],
-      transformPayload: (payload) => ({
-        text: `Session ${payload.sessionId} is now idle`,
-      }),
-    },
-  ],
-  debug: true,
-});
-
-// Export for Opencode to load
-export { webhookPlugin };
-```
-
-### Slack Idle Notification Example
-
-Send a formatted Slack message when a session becomes idle:
-
-```typescript
-import { createWebhookPlugin, OpencodeEventType, SlackMessage } from 'opencode-webhooks';
-
-const webhookPlugin = createWebhookPlugin({
-  webhooks: [
-    {
-      url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL',
-      events: [OpencodeEventType.SESSION_IDLE],
-      transformPayload: (payload) => {
-        const slackMessage: SlackMessage = {
-          text: '⏸️ Session Idle Notification',
-          blocks: [
-            {
-              type: 'header',
-              text: {
-                type: 'plain_text',
-                text: '⏸️ Opencode Session is Idle',
-                emoji: true,
-              },
-            },
-            {
-              type: 'section',
-              fields: [
-                {
-                  type: 'mrkdwn',
-                  text: `*Session ID:*\n${payload.sessionId || 'Unknown'}`,
-                },
-                {
-                  type: 'mrkdwn',
-                  text: `*Time:*\n${new Date(payload.timestamp).toLocaleString()}`,
-                },
-              ],
-            },
-          ],
-        };
-        return slackMessage;
-      },
-      retry: {
-        maxAttempts: 3,
-        delayMs: 1000,
-      },
-      timeoutMs: 5000,
-    },
-  ],
-  debug: true,
+const plugin = createWebhookPlugin({
+  webhooks: [{
+    url: 'https://example.com',
+    events: [OpencodeEventType.SESSION_CREATED],
+    transformPayload: (payload: BaseEventPayload) => payload,
+  }],
 });
 ```
 
-## Available Event Types
+## Troubleshooting
 
-The plugin supports all Opencode event types:
-
-### Session Events
-- `SESSION_START` - When a new session starts
-- `SESSION_END` - When a session ends
-- `SESSION_IDLE` - When a session becomes idle
-- `SESSION_ACTIVE` - When a session becomes active again
-
-### Code Events
-- `CODE_CHANGE` - When code is modified
-- `CODE_SAVE` - When code is saved
-- `CODE_EXECUTE` - When code is executed
-
-### Error Events
-- `ERROR_OCCURRED` - When an error occurs
-- `ERROR_RESOLVED` - When an error is resolved
-
-### Build Events
-- `BUILD_START` - When a build starts
-- `BUILD_SUCCESS` - When a build succeeds
-- `BUILD_FAILED` - When a build fails
-
-### Test Events
-- `TEST_START` - When tests start running
-- `TEST_SUCCESS` - When tests pass
-- `TEST_FAILED` - When tests fail
-
-### User Events
-- `USER_ACTION` - When a user performs an action
-- `USER_INPUT` - When a user provides input
-
-## Configuration Options
-
-### WebhookConfig
-
-Each webhook configuration supports the following options:
+### Enable Debug Logging
 
 ```typescript
-interface WebhookConfig {
-  // Required: The webhook URL
-  url: string;
-
-  // Required: Array of events that trigger this webhook
-  events: OpencodeEventType[];
-
-  // Optional: HTTP method (default: POST)
-  method?: 'POST' | 'PUT' | 'PATCH';
-
-  // Optional: Custom headers
-  headers?: Record<string, string>;
-
-  // Optional: Transform the payload before sending
-  transformPayload?: (payload: BaseEventPayload) => any;
-
-  // Optional: Filter function to determine if webhook should be sent
-  shouldSend?: (payload: BaseEventPayload) => boolean;
-
-  // Optional: Retry configuration
-  retry?: {
-    maxAttempts?: number;  // Default: 3
-    delayMs?: number;      // Default: 1000
-  };
-
-  // Optional: Request timeout in milliseconds
-  timeoutMs?: number;  // Default: 10000
-}
-```
-
-### WebhookPluginConfig
-
-Global plugin configuration:
-
-```typescript
-interface WebhookPluginConfig {
-  // Required: Array of webhook configurations
-  webhooks: WebhookConfig[];
-
-  // Optional: Enable debug logging
-  debug?: boolean;
-
-  // Optional: Default timeout for all webhooks
-  defaultTimeoutMs?: number;
-
-  // Optional: Default retry configuration
-  defaultRetry?: {
-    maxAttempts?: number;
-    delayMs?: number;
-  };
-}
-```
-
-## Advanced Examples
-
-### Multiple Webhooks
-
-Configure different webhooks for different events:
-
-```typescript
-const webhookPlugin = createWebhookPlugin({
-  webhooks: [
-    // Slack for idle sessions
-    {
-      url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK',
-      events: [OpencodeEventType.SESSION_IDLE],
-      transformPayload: (payload) => ({
-        text: `Session ${payload.sessionId} is idle`,
-      }),
-    },
-    // Discord for errors
-    {
-      url: 'https://discord.com/api/webhooks/YOUR/WEBHOOK',
-      events: [OpencodeEventType.ERROR_OCCURRED],
-      transformPayload: (payload) => ({
-        content: `Error: ${payload.error}`,
-      }),
-    },
-    // Custom endpoint for all events
-    {
-      url: 'https://your-api.com/opencode-events',
-      events: Object.values(OpencodeEventType),
-      headers: {
-        'Authorization': 'Bearer YOUR_TOKEN',
-      },
-    },
-  ],
-});
-```
-
-### Conditional Webhooks
-
-Use `shouldSend` to filter when webhooks are sent:
-
-```typescript
-{
-  url: 'https://hooks.slack.com/services/YOUR/WEBHOOK',
-  events: [OpencodeEventType.ERROR_OCCURRED],
-  shouldSend: (payload) => {
-    // Only send critical errors
-    const errorMessage = payload.error || '';
-    return errorMessage.includes('CRITICAL');
-  },
-  transformPayload: (payload) => ({
-    text: `🚨 CRITICAL ERROR: ${payload.error}`,
-  }),
-}
-```
-
-### Custom Headers and Authentication
-
-Add custom headers for authentication:
-
-```typescript
-{
-  url: 'https://your-api.com/webhooks',
-  events: [OpencodeEventType.BUILD_SUCCESS],
-  headers: {
-    'Authorization': 'Bearer YOUR_API_TOKEN',
-    'X-Custom-Header': 'custom-value',
-    'Content-Type': 'application/json',
-  },
-}
-```
-
-### Retry Configuration
-
-Customize retry behavior for unreliable endpoints:
-
-```typescript
-{
-  url: 'https://unreliable-endpoint.com/webhook',
-  events: [OpencodeEventType.SESSION_START],
-  retry: {
-    maxAttempts: 5,      // Try up to 5 times
-    delayMs: 2000,       // Wait 2 seconds between attempts (exponential backoff)
-  },
-  timeoutMs: 15000,      // 15 second timeout
-}
-```
-
-## Platform-Specific Examples
-
-### Slack
-
-```typescript
-{
-  url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL',
-  events: [OpencodeEventType.BUILD_FAILED],
-  transformPayload: (payload) => ({
-    text: 'Build Failed',
-    blocks: [
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `*Build Failed*\n\`\`\`${payload.error}\`\`\``,
-        },
-      },
-    ],
-  }),
-}
-```
-
-### Discord
-
-```typescript
-{
-  url: 'https://discord.com/api/webhooks/YOUR/WEBHOOK',
-  events: [OpencodeEventType.TEST_SUCCESS],
-  transformPayload: (payload) => ({
-    content: 'Tests passed!',
-    embeds: [
-      {
-        title: 'Test Results',
-        description: 'All tests passed successfully',
-        color: 3066993, // Green
-        timestamp: payload.timestamp,
-      },
-    ],
-  }),
-}
-```
-
-### Microsoft Teams
-
-```typescript
-{
-  url: 'https://outlook.office.com/webhook/YOUR/TEAMS/WEBHOOK',
-  events: [OpencodeEventType.ERROR_OCCURRED],
-  transformPayload: (payload) => ({
-    '@type': 'MessageCard',
-    '@context': 'https://schema.org/extensions',
-    summary: 'Error Occurred',
-    themeColor: 'FF0000',
-    title: 'Error in Opencode',
-    sections: [
-      {
-        facts: [
-          { name: 'Error', value: payload.error },
-          { name: 'Session', value: payload.sessionId },
-        ],
-      },
-    ],
-  }),
-}
-```
-
-## Development
-
-### Building
-
-```bash
-npm run build
-```
-
-### Watch Mode
-
-```bash
-npm run watch
-```
-
-### Usage Examples
-
-The interactive installer (`npm run install-plugin`) provides ready-to-use configurations for:
-
-- Slack notifications via Workflow Builder
-- Custom webhook endpoints
-- Debug mode for troubleshooting
-
-## Debugging
-
-Enable debug mode to see detailed logs:
-
-```typescript
-const webhookPlugin = createWebhookPlugin({
-  webhooks: [...],
+export default createWebhookPlugin({
+  webhooks: [/* ... */],
   debug: true,  // Enable debug logging
 });
 ```
@@ -463,309 +326,23 @@ Debug output includes:
 - Retry attempts
 - Errors and failures
 
-## Error Handling
-
-The plugin includes robust error handling:
-
-- Automatic retries with exponential backoff
-- Timeout protection
-- Detailed error messages
-- Non-blocking: webhook failures don't affect Opencode operation
-
-## HTTP Request Format
-
-When a webhook is triggered, the plugin sends an HTTP request to your endpoint with the following properties:
-
-### Request Headers
-
-```
-Content-Type: application/json
-User-Agent: Opencode-Webhook-Plugin/1.0
-```
-
-Any custom headers you specify in the `headers` configuration will also be included.
-
-### Request Method
-
-By default, webhooks use `POST`, but you can configure `PUT` or `PATCH` via the `method` option.
-
-### Request Body
-
-The request body contains the event payload, which can be:
-
-1. **Default payload** - If no `transformPayload` function is provided, the raw event data is sent:
-
-```json
-{
-  "timestamp": "2025-11-22T10:30:00.000Z",
-  "eventType": "session.idle",
-  "sessionId": "abc123",
-  "userId": "user456",
-  // Additional event-specific properties...
-}
-```
-
-2. **Transformed payload** - If you provide a `transformPayload` function, the body will contain whatever your function returns:
-
-```typescript
-transformPayload: (payload) => ({
-  text: `Session ${payload.sessionId} is idle`,
-  timestamp: payload.timestamp,
-})
-```
-
-### Base Event Properties
-
-All event payloads include these base properties:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `timestamp` | `string` | ISO 8601 timestamp when the event occurred |
-| `eventType` | `OpencodeEventType` | The type of event (e.g., `"session.idle"`) |
-| `sessionId` | `string` (optional) | The current Opencode session ID |
-| `userId` | `string` (optional) | The user ID associated with the event |
-
-Additional properties vary by event type and are included in the payload object.
-
-### Inspecting Event-Specific Properties
-
-Each event type may include additional properties beyond the base properties. To discover what properties are available for each event:
-
-**Method 1: Enable Debug Mode**
-
-Enable debug logging to see the full payload structure in your console:
-
-```typescript
-const webhookPlugin = createWebhookPlugin({
-  webhooks: [
-    {
-      url: 'https://your-endpoint.com/webhook',
-      events: [OpencodeEventType.SESSION_IDLE],
-    },
-  ],
-  debug: true,  // This will log all event payloads
-});
-```
-
-When an event occurs, you'll see output like:
-```
-[WebhookPlugin] Handling event: session.idle {
-  timestamp: '2025-11-22T10:30:00.000Z',
-  eventType: 'session.idle',
-  sessionId: 'abc123',
-  userId: 'user456',
-  // ... additional event-specific properties
-}
-```
-
-**Method 2: Use a Logging Transform**
-
-Create a webhook with a transform function that logs the payload:
-
-```typescript
-{
-  url: 'https://your-endpoint.com/webhook',
-  events: [OpencodeEventType.SESSION_IDLE],
-  transformPayload: (payload) => {
-    console.log('Full event payload:', JSON.stringify(payload, null, 2));
-    return payload;
-  },
-}
-```
-
-**Method 3: Use a Webhook Inspector Service**
-
-Send events to a webhook inspection service to view the request body:
-
-- [webhook.site](https://webhook.site) - Free webhook inspection
-- [requestbin.com](https://requestbin.com) - Request inspection
-- [beeceptor.com](https://beeceptor.com) - API mocking and inspection
-
-```typescript
-{
-  url: 'https://webhook.site/your-unique-id',
-  events: [OpencodeEventType.SESSION_IDLE],
-  // Don't transform - send raw payload to see all properties
-}
-```
-
-**Method 4: TypeScript Type Exploration**
-
-The `BaseEventPayload` type includes an index signature that allows any additional properties:
-
-```typescript
-interface BaseEventPayload {
-  timestamp: string;
-  eventType: OpencodeEventType;
-  sessionId?: string;
-  userId?: string;
-  [key: string]: any;  // Additional event-specific properties
-}
-```
-
-Access properties safely in your transform function:
-
-```typescript
-transformPayload: (payload) => {
-  // Access any property - TypeScript won't error
-  const customProp = payload.customProperty;
-  
-  // Or log all properties
-  console.log('Available properties:', Object.keys(payload));
-  
-  return { /* transformed payload */ };
-}
-```
-
-**Example: Exploring a Session Idle Event**
-
-```typescript
-{
-  url: 'https://webhook.site/your-unique-id',
-  events: [OpencodeEventType.SESSION_IDLE],
-  transformPayload: (payload) => {
-    // Log all available properties
-    console.log('Property names:', Object.keys(payload));
-    console.log('Full payload:', payload);
-    
-    // Return payload with metadata for inspection
-    return {
-      ...payload,
-      inspectedAt: new Date().toISOString(),
-      propertyCount: Object.keys(payload).length,
-    };
-  },
-}
-```
-
-### Request Timeout
-
-The default request timeout is 10 seconds (10000ms). You can customize this per webhook:
-
-```typescript
-{
-  url: 'https://your-endpoint.com/webhook',
-  events: [OpencodeEventType.SESSION_IDLE],
-  timeoutMs: 5000,  // 5 second timeout
-}
-```
-
-### Example Raw Request
-
-Here's what a typical webhook request looks like:
-
-```http
-POST /webhook HTTP/1.1
-Host: hooks.slack.com
-Content-Type: application/json
-User-Agent: Opencode-Webhook-Plugin/1.0
-
-{
-  "timestamp": "2025-11-22T10:30:00.000Z",
-  "eventType": "session.idle",
-  "sessionId": "abc123",
-  "userId": "user456"
-}
-```
-
-## Type Definitions
-
-Full TypeScript support with exported types:
-
-```typescript
-import {
-  createWebhookPlugin,
-  OpencodeEventType,
-  WebhookConfig,
-  WebhookPluginConfig,
-  BaseEventPayload,
-  WebhookResult,
-  SlackMessage,
-} from 'opencode-webhooks';
-```
-
-## Development
-
-### Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Run tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run linter
-npm run lint
-
-# Fix linting issues
-npm run lint:fix
-
-# Build the project
-npm run build
-
-# Watch mode for development
-npm run watch
-
-# Create npm package (build + pack)
-npm run package
-```
-
-### GitHub Actions CI/CD
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-- **CI Workflow** - Runs on push and pull requests
-  - Lints code with ESLint
-  - Runs tests on Node.js 18 and 20
-  - Builds TypeScript
-  - Creates and verifies npm package
-  - Reports test coverage
-  - Uploads package artifact
-
-- **PR Checks** - Additional validation for pull requests
-  - Type checking
-  - Bundle size analysis
-  - Coverage reporting
-
-- **Release Workflow** - Automated publishing
-  - Publishes to npm on GitHub releases
-  - Creates release artifacts
-
-### Code Quality
-
-- **98% test coverage** - Comprehensive unit and integration tests
-- **ESLint** - Strict TypeScript linting rules
-- **TypeScript** - Full type safety
-- **Jest** - Modern testing framework
-
-## Publishing
-
-### Automated Release Process
-
-The package is automatically published to npm when a new GitHub release is created:
-
-1. Update version: `npm version patch|minor|major`
-2. Push changes: `git push && git push --tags`
-3. Create a GitHub release with the version tag
-4. The Release workflow automatically:
-   - Verifies version matches release tag
-   - Runs all tests and quality checks
-   - Builds and publishes to npm with provenance
-   - Uploads release assets
-   - Creates a detailed release summary
-
-See [RELEASE.md](./RELEASE.md) for detailed release instructions.
-
-### NPM Package Verification
-
-The CI pipeline includes npm publish verification:
-- Dry-run publish on every build
-- Package content validation
-- Ensures publishability before release
+### Common Issues
+
+**Plugin not loading:**
+- Ensure the file is in `~/.config/opencode/plugin/`
+- Check the file has a `.ts` extension
+- Verify it exports a plugin using `export default`
+- Restart OpenCode after making changes
+
+**Webhooks not sending:**
+- Check the webhook URL is correct
+- Enable debug mode to see detailed logs
+- Verify the events you're listening for are actually firing
+- Check network connectivity
+
+**TypeScript errors:**
+- If using NPM global install, the import should be `from 'opencode-webhooks'`
+- If using local clone, the import should be `from './opencode-webhooks/src/index.ts'`
 
 ## License
 
@@ -773,10 +350,4 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
-
-## Support
-
-For issues and questions:
-- GitHub Issues: [opencode-webhooks](https://github.com/yourusername/opencode-webhooks)
-- Documentation: [opencode.ai/docs/plugins](https://opencode.ai/docs/plugins)
+Contributions are welcome! Please feel free to submit a Pull Request.

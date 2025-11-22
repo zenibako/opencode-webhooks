@@ -9,6 +9,7 @@ export enum OpencodeEventType {
   SESSION_IDLE = 'session.idle',
   SESSION_ERROR = 'session.error',
   SESSION_DELETED = 'session.deleted',
+  SESSION_RESUMED = 'session.resumed',
   SESSION_COMPACTED = 'session.compacted',
   SESSION_STATUS = 'session.status',
   SESSION_DIFF = 'session.diff',
@@ -64,7 +65,7 @@ export interface WebhookConfig {
   url: string;
 
   /** The events that should trigger this webhook */
-  events: OpencodeEventType[];
+  events: (OpencodeEventType | string)[];
 
   /** Optional: HTTP method (default: POST) */
   method?: 'POST' | 'PUT' | 'PATCH';
@@ -117,17 +118,4 @@ export interface WebhookResult {
   statusCode?: number;
   error?: string;
   attempts: number;
-}
-
-/**
- * Slack-specific message format
- */
-export interface SlackMessage {
-  text?: string;
-  blocks?: any[];
-  attachments?: any[];
-  channel?: string;
-  username?: string;
-  icon_emoji?: string;
-  icon_url?: string;
 }
