@@ -87,11 +87,11 @@ jobs:
       - name: Upload release assets
         run: |
           # Upload the tarball
-          gh release upload ${{ github.event.release.tag_name }} ${{ env.TARBALL }} --clobber
+          gh release upload "${{ github.event.release.tag_name }}" "${{ env.TARBALL }}" --clobber
 
           # Create additional archive with source
           tar -czf opencode-webhook-plugin-source.tar.gz dist/ src/ package.json README.md LICENSE
-          gh release upload ${{ github.event.release.tag_name }} opencode-webhook-plugin-source.tar.gz --clobber
+          gh release upload "${{ github.event.release.tag_name }}" opencode-webhook-plugin-source.tar.gz --clobber
 
           echo "✅ Release assets uploaded"
         env:

@@ -1,6 +1,6 @@
 {
   "name": "opencode-webhooks",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Opencode plugin for sending webhook notifications on any Opencode event",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,7 +36,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/zenibako/opencode-webhooks.git"
+    "url": "git+https://github.com/zenibako/opencode-webhooks.git"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
