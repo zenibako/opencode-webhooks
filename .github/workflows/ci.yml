@@ -235,15 +235,15 @@ jobs:
         run: |
           echo "=== Testing plugin can be loaded ==="
           
-          # Create a test directory with package.json to install the global package locally
+          # Create a test directory with package.json
           mkdir -p /tmp/plugin-load-test
           cd /tmp/plugin-load-test
           npm init -y
           
-          # Install from the global location
-          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
-          npm install -g "$GITHUB_WORKSPACE/../opencode-webhooks/opencode-webhooks-0.0.4.tgz" 2>&1 | head -5 || true
-          npm install "$PACKAGE_NAME"
+          # Install from the tarball in the workspace
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          echo "Installing from tarball: $TARBALL"
+          npm install "$TARBALL"
           
           # Create a test script that imports and instantiates the plugin
           cat > test-plugin-load.mjs << 'EOF'
