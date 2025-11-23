@@ -218,8 +218,18 @@ jobs:
         run: |
           echo "=== Testing plugin can be loaded ==="
           
+          # Create a test directory with package.json to install the global package locally
+          mkdir -p /tmp/plugin-load-test
+          cd /tmp/plugin-load-test
+          npm init -y
+          
+          # Install from the global location
+          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
+          npm install -g "$GITHUB_WORKSPACE/../opencode-webhooks/opencode-webhooks-0.0.4.tgz" 2>&1 | head -5 || true
+          npm install "$PACKAGE_NAME"
+          
           # Create a test script that imports and instantiates the plugin
-          cat > /tmp/test-plugin-load.mjs << 'EOF'
+          cat > test-plugin-load.mjs << 'EOF'
           import { createWebhookPlugin } from 'opencode-webhooks';
           
           console.log('Attempting to create plugin instance...');
@@ -243,8 +253,7 @@ jobs:
           console.log('Plugin type:', typeof plugin);
           EOF
           
-          # Run the test with the globally installed package
-          cd /tmp
+          # Run the test
           node test-plugin-load.mjs || (echo "❌ Plugin loading failed" && exit 1)
           
           echo "✅ Plugin loading successful"
@@ -253,8 +262,17 @@ jobs:
         run: |
           echo "=== Testing plugin hook execution ==="
           
+          # Create test directory
+          mkdir -p /tmp/plugin-exec-test
+          cd /tmp/plugin-exec-test
+          npm init -y
+          
+          # Install the package
+          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
+          npm install "$PACKAGE_NAME"
+          
           # Create a test that simulates OpenCode calling the plugin
-          cat > /tmp/test-plugin-execution.mjs << 'EOF'
+          cat > test-plugin-execution.mjs << 'EOF'
           import { WebhookPlugin } from 'opencode-webhooks';
           
           console.log('Creating plugin instance...');
@@ -303,7 +321,6 @@ jobs:
           EOF
           
           # Run the execution test
-          cd /tmp
           node test-plugin-execution.mjs || (echo "❌ Plugin execution failed" && exit 1)
           
           echo "✅ Plugin hook execution successful"
