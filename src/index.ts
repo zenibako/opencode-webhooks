@@ -5,8 +5,8 @@ import {
   BaseEventPayload,
   OpencodeEventType,
   WebhookResult,
-} from './types';
-import { WebhookClient } from './webhook-client';
+} from './types.js';
+import { WebhookClient } from './webhook-client.js';
 
 /**
  * Opencode Webhook Plugin Class
@@ -136,5 +136,5 @@ export function createWebhookPlugin(config: WebhookPluginConfig): Plugin {
 }
 
 // Export types for consumers
-export * from './types';
-export { WebhookClient } from './webhook-client';
+export * from './types.js';
+export { WebhookClient } from './webhook-client.js';

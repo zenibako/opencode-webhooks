@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { WebhookConfig, WebhookResult, BaseEventPayload } from './types';
+import { WebhookConfig, WebhookResult, BaseEventPayload } from './types.js';
 
 /**
  * Webhook client for sending HTTP requests
