@@ -20,27 +20,29 @@ Send webhook notifications for any OpenCode event. Perfect for integrating with 
 
 ## Installation
 
-### Option 1: Install from NPM (Recommended)
+### Option 1: Install Locally in Plugins Directory (Recommended)
 
 ```bash
-# Install globally
-npm install -g opencode-webhooks
+# Create a node_modules in your plugins directory
+cd ~/.config/opencode/plugin
+npm init -y  # Creates package.json if it doesn't exist
+npm install opencode-webhooks
 
 # Copy an example to your plugins directory
-cp $(npm root -g)/opencode-webhooks/examples/slack-workflow.ts ~/.config/opencode/plugin/
+cp node_modules/opencode-webhooks/examples/slack-workflow.ts ./
 
 # Edit the file to add your webhook URL
-nano ~/.config/opencode/plugin/slack-workflow.ts
+nano slack-workflow.ts
 
 # Restart OpenCode
 ```
 
-### Option 2: Clone to Plugins Directory
+### Option 2: Clone to Plugins Directory (Development)
 
 ```bash
 # Clone directly into the plugins directory
 cd ~/.config/opencode/plugin
-git clone https://github.com/yourusername/opencode-webhooks.git
+git clone https://github.com/zenibako/opencode-webhooks.git
 
 # Copy an example to the plugin root
 cp opencode-webhooks/examples/local-dev.ts ./webhook.ts
@@ -50,6 +52,8 @@ nano webhook.ts
 
 # Restart OpenCode
 ```
+
+> **Note:** OpenCode's Bun runtime needs to resolve the `opencode-webhooks` package. Installing it locally in `~/.config/opencode/plugin/node_modules/` ensures Bun can find it. Global npm installs may not be accessible to Bun's module resolution.
 
 ## Quick Start
 
@@ -328,7 +332,10 @@ Debug output includes:
 
 ### Common Issues
 
-**Plugin not loading:**
+**SIGTRAP errors or plugin not loading:**
+- The package must be installed locally in `~/.config/opencode/plugin/node_modules/`
+- Global npm installs (`npm install -g`) are not accessible to OpenCode's Bun runtime
+- Solution: Run `cd ~/.config/opencode/plugin && npm install opencode-webhooks`
 - Ensure the file is in `~/.config/opencode/plugin/`
 - Check the file has a `.ts` extension
 - Verify it exports a plugin using `export default`
@@ -340,9 +347,10 @@ Debug output includes:
 - Verify the events you're listening for are actually firing
 - Check network connectivity
 
-**TypeScript errors:**
-- If using NPM global install, the import should be `from 'opencode-webhooks'`
-- If using local clone, the import should be `from './opencode-webhooks/src/index.ts'`
+**Import errors:**
+- If installed locally in plugin directory: `import { createWebhookPlugin } from 'opencode-webhooks';`
+- If using local clone: `import { createWebhookPlugin } from './opencode-webhooks/src/index.ts';`
+- Make sure `package.json` exists in `~/.config/opencode/plugin/` (create with `npm init -y` if needed)
 
 ## License
 
