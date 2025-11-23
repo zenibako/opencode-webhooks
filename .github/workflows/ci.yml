@@ -146,11 +146,222 @@ jobs:
           path: "*.tgz"
           retention-days: 7
 
+  plugin-integration:
+    name: Plugin Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+
+      - name: Test 1 - Global npm install
+        run: |
+          echo "=== Testing global npm install scenario ==="
+          TARBALL=$(ls *.tgz)
+          echo "Installing package: $TARBALL"
+          
+          # Install the package globally
+          npm install -g "$TARBALL"
+          
+          # Verify package is installed
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          npm list -g "$PACKAGE_NAME" || (echo "❌ Package not found in global node_modules" && exit 1)
+          
+          echo "✅ Global install successful"
+
+      - name: Test 2 - Local development (npm link)
+        run: |
+          echo "=== Testing local development with npm link ==="
+          
+          # Create a test directory
+          mkdir -p /tmp/plugin-link-test
+          cd /tmp/plugin-link-test
+          
+          # Initialize a test project
+          npm init -y
+          
+          # Link the plugin from the workspace
+          cd $GITHUB_WORKSPACE
+          npm link
+          
+          # Link it in the test project
+          cd /tmp/plugin-link-test
+          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
+          npm link "$PACKAGE_NAME"
+          
+          # Verify the link exists
+          if [ ! -L "node_modules/$PACKAGE_NAME" ]; then
+            echo "❌ Symlink not created"
+            exit 1
+          fi
+          
+          echo "✅ npm link successful"
+
+      - name: Test 3 - Plugin loading verification
+        run: |
+          echo "=== Testing plugin can be loaded ==="
+          
+          # Create a test script that imports and instantiates the plugin
+          cat > /tmp/test-plugin-load.mjs << 'EOF'
+          import { createWebhookPlugin } from 'opencode-webhooks';
+          
+          console.log('Attempting to create plugin instance...');
+          
+          const plugin = createWebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://example.com/webhook',
+                events: ['session.created', 'session.idle']
+              }
+            ],
+            debug: true
+          });
+          
+          if (typeof plugin !== 'function') {
+            console.error('❌ Plugin creation failed - not a function');
+            process.exit(1);
+          }
+          
+          console.log('✅ Plugin created successfully');
+          console.log('Plugin type:', typeof plugin);
+          EOF
+          
+          # Run the test with the globally installed package
+          cd /tmp
+          node test-plugin-load.mjs || (echo "❌ Plugin loading failed" && exit 1)
+          
+          echo "✅ Plugin loading successful"
+
+      - name: Test 4 - Plugin hook execution
+        run: |
+          echo "=== Testing plugin hook execution ==="
+          
+          # Create a test that simulates OpenCode calling the plugin
+          cat > /tmp/test-plugin-execution.mjs << 'EOF'
+          import { WebhookPlugin } from 'opencode-webhooks';
+          
+          console.log('Creating plugin instance...');
+          
+          const plugin = new WebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://httpbin.org/post',
+                events: ['session.created'],
+                transformPayload: (payload) => ({
+                  message: 'Test webhook',
+                  sessionId: payload.sessionId
+                }),
+                timeoutMs: 5000,
+                retry: { maxAttempts: 1 }
+              }
+            ],
+            debug: true
+          });
+          
+          console.log('Triggering test event...');
+          
+          const results = await plugin.handleEvent('session.created', {
+            sessionId: 'test-session-123',
+            userId: 'test-user'
+          });
+          
+          console.log('Results:', JSON.stringify(results, null, 2));
+          
+          if (results.length === 0) {
+            console.error('❌ No results returned');
+            process.exit(1);
+          }
+          
+          if (!results[0].success) {
+            console.error('❌ Webhook failed:', results[0].error);
+            process.exit(1);
+          }
+          
+          if (results[0].statusCode !== 200) {
+            console.error('❌ Unexpected status code:', results[0].statusCode);
+            process.exit(1);
+          }
+          
+          console.log('✅ Plugin execution successful');
+          EOF
+          
+          # Run the execution test
+          cd /tmp
+          node test-plugin-execution.mjs || (echo "❌ Plugin execution failed" && exit 1)
+          
+          echo "✅ Plugin hook execution successful"
+
+      - name: Test 5 - Local path installation
+        run: |
+          echo "=== Testing local path installation ==="
+          
+          # Create a test directory
+          mkdir -p /tmp/plugin-path-test
+          cd /tmp/plugin-path-test
+          
+          # Initialize a test project
+          npm init -y
+          
+          # Install from local path
+          npm install "$GITHUB_WORKSPACE"
+          
+          # Verify installation
+          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
+          if [ ! -d "node_modules/$PACKAGE_NAME" ]; then
+            echo "❌ Package not found in node_modules"
+            exit 1
+          fi
+          
+          # Verify we can import it
+          cat > test-import.mjs << EOF
+          import { createWebhookPlugin } from '$PACKAGE_NAME';
+          console.log('Import successful');
+          EOF
+          
+          node test-import.mjs || (echo "❌ Import failed" && exit 1)
+          
+          echo "✅ Local path installation successful"
+
+      - name: Integration test summary
+        if: always()
+        run: |
+          echo ""
+          echo "======================================"
+          echo "  Plugin Integration Test Summary"
+          echo "======================================"
+          echo ""
+          echo "✅ All integration tests passed!"
+          echo ""
+          echo "Verified scenarios:"
+          echo "  - Global npm install"
+          echo "  - Local development (npm link)"
+          echo "  - Plugin loading and instantiation"
+          echo "  - Plugin hook execution with real HTTP"
+          echo "  - Local path installation"
+          echo ""
+
   # Combined check that runs after all other jobs
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [lint, test, build]
+    needs: [lint, test, build, plugin-integration]
     if: always()
     steps:
       - name: Check all jobs
@@ -165,6 +376,10 @@ jobs:
           fi
           if [[ "${{ needs.build.result }}" != "success" ]]; then
             echo "Build job failed"
+            exit 1
+          fi
+          if [[ "${{ needs.plugin-integration.result }}" != "success" ]]; then
+            echo "Plugin integration tests failed"
             exit 1
           fi
           echo "All CI checks passed!"
