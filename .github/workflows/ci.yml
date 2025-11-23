@@ -171,6 +171,23 @@ jobs:
         with:
           name: npm-package
 
+      - name: Debug - Check artifact contents
+        run: |
+          echo "=== Checking downloaded artifact ==="
+          TARBALL=$(ls *.tgz)
+          echo "Tarball: $TARBALL"
+          
+          # Extract and check the dist/index.js file
+          mkdir -p /tmp/artifact-check
+          tar -xzf "$TARBALL" -C /tmp/artifact-check
+          
+          echo "First 10 lines of dist/index.js:"
+          head -10 /tmp/artifact-check/package/dist/index.js
+          
+          echo ""
+          echo "Checking for .js extensions in imports:"
+          grep "from './" /tmp/artifact-check/package/dist/index.js || echo "No relative imports found"
+
       - name: Test 1 - Global npm install
         run: |
           echo "=== Testing global npm install scenario ==="
