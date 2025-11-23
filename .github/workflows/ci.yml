@@ -284,9 +284,10 @@ jobs:
           cd /tmp/plugin-exec-test
           npm init -y
           
-          # Install the package
-          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
-          npm install "$PACKAGE_NAME"
+          # Install from the tarball
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          echo "Installing from tarball: $TARBALL"
+          npm install "$TARBALL"
           
           # Create a test that simulates OpenCode calling the plugin
           cat > test-plugin-execution.mjs << 'EOF'
