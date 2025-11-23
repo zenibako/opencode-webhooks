@@ -1,6 +1,6 @@
 {
   "name": "opencode-webhooks",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Opencode plugin for sending webhook notifications on any Opencode event",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
