@@ -20,12 +20,18 @@ Send webhook notifications for any OpenCode event. Perfect for integrating with 
 
 ## Installation
 
-### Option 1: Install Locally in Plugins Directory (Recommended)
+### Option 1: Install via npm (Recommended)
+
+OpenCode uses Bun to load plugins, which resolves dependencies from the **parent directory** of your plugin files. This means the plugin must be installed in `~/.config/opencode/plugin/node_modules/`.
 
 ```bash
-# Create a node_modules in your plugins directory
+# Navigate to the OpenCode plugins directory
 cd ~/.config/opencode/plugin
-npm init -y  # Creates package.json if it doesn't exist
+
+# Initialize package.json if it doesn't exist
+npm init -y
+
+# Install the plugin - Bun will find it from parent folder
 npm install opencode-webhooks
 
 # Copy an example to your plugins directory
@@ -37,14 +43,27 @@ nano slack-workflow.ts
 # Restart OpenCode
 ```
 
-### Option 2: Clone to Plugins Directory (Development)
+**How Bun finds the module:**
+- Your plugin file: `~/.config/opencode/plugin/slack-workflow.ts`
+- Bun looks up from the plugin file's directory
+- Finds: `~/.config/opencode/plugin/node_modules/opencode-webhooks`
+- Import works: `import { createWebhookPlugin } from 'opencode-webhooks';`
+
+### Option 2: Clone for Development
+
+For local development or contributing to the plugin:
 
 ```bash
 # Clone directly into the plugins directory
 cd ~/.config/opencode/plugin
 git clone https://github.com/zenibako/opencode-webhooks.git
 
-# Copy an example to the plugin root
+# Install dependencies for the cloned repo
+cd opencode-webhooks
+npm install
+cd ..
+
+# Copy an example to the plugin root (parent of opencode-webhooks/)
 cp opencode-webhooks/examples/local-dev.ts ./webhook.ts
 
 # Edit the file to add your webhook URL
@@ -53,7 +72,7 @@ nano webhook.ts
 # Restart OpenCode
 ```
 
-> **Note:** OpenCode's Bun runtime needs to resolve the `opencode-webhooks` package. Installing it locally in `~/.config/opencode/plugin/node_modules/` ensures Bun can find it. Global npm installs may not be accessible to Bun's module resolution.
+> **Important:** Global npm installs (`npm install -g`) will **not** work because Bun resolves modules relative to the plugin file's location, not from global paths.
 
 ## Quick Start
 
@@ -71,25 +90,30 @@ nano webhook.ts
 
 ```typescript
 // ~/.config/opencode/plugin/slack-webhook.ts
+import type { Plugin } from '@opencode-ai/plugin';
 import { createWebhookPlugin } from 'opencode-webhooks';
 
-export default createWebhookPlugin({
+const SlackWebhook: Plugin = createWebhookPlugin({
   webhooks: [
     {
       url: 'https://hooks.slack.com/workflows/T123/A456/789/abc',
       events: ['session.created', 'session.idle', 'session.error'],
       transformPayload: (payload) => ({
+        ...payload,
         eventType: payload.eventType,
         sessionId: payload.sessionId || 'N/A',
         timestamp: payload.timestamp,
         message: `🔔 ${payload.eventType}`,
         eventInfo: `Event: ${payload.eventType}`,
-        ...payload,
       }),
     },
   ],
 });
+
+export default SlackWebhook;
 ```
+
+> **Important:** The `Plugin` type annotation is required for OpenCode to properly load your plugin. The `@opencode-ai/plugin` module is provided by OpenCode's runtime.
 
 3. **Restart OpenCode** - The plugin will automatically load and start sending events!
 
@@ -97,9 +121,10 @@ export default createWebhookPlugin({
 
 ```typescript
 // ~/.config/opencode/plugin/custom-webhook.ts
+import type { Plugin } from '@opencode-ai/plugin';
 import { createWebhookPlugin } from 'opencode-webhooks';
 
-export default createWebhookPlugin({
+const CustomWebhook: Plugin = createWebhookPlugin({
   webhooks: [
     {
       url: 'https://your-endpoint.com/api/events',
@@ -111,6 +136,8 @@ export default createWebhookPlugin({
   ],
   debug: true,
 });
+
+export default CustomWebhook;
 ```
 
 ## Available Events
@@ -164,9 +191,10 @@ export default createWebhookPlugin({
 ### Basic Configuration
 
 ```typescript
+import type { Plugin } from '@opencode-ai/plugin';
 import { createWebhookPlugin } from 'opencode-webhooks';
 
-export default createWebhookPlugin({
+const MyWebhook: Plugin = createWebhookPlugin({
   webhooks: [
     {
       url: 'https://your-webhook.com',
@@ -174,14 +202,17 @@ export default createWebhookPlugin({
     },
   ],
 });
+
+export default MyWebhook;
 ```
 
 ### Advanced Configuration
 
 ```typescript
+import type { Plugin } from '@opencode-ai/plugin';
 import { createWebhookPlugin } from 'opencode-webhooks';
 
-export default createWebhookPlugin({
+const AdvancedWebhook: Plugin = createWebhookPlugin({
   webhooks: [
     {
       // Webhook URL (required)
@@ -234,6 +265,8 @@ export default createWebhookPlugin({
     delayMs: 1000,
   },
 });
+
+export default AdvancedWebhook;
 ```
 
 ## Examples
@@ -301,26 +334,55 @@ npm run lint:fix
 This package is written in TypeScript and provides full type definitions. OpenCode runs it directly via Bun without any build step.
 
 ```typescript
-import { createWebhookPlugin, OpencodeEventType, BaseEventPayload } from 'opencode-webhooks';
+import type { Plugin } from '@opencode-ai/plugin';
+import { 
+  createWebhookPlugin, 
+  OpencodeEventType, 
+  BaseEventPayload 
+} from 'opencode-webhooks';
 
-const plugin = createWebhookPlugin({
+const MyPlugin: Plugin = createWebhookPlugin({
   webhooks: [{
     url: 'https://example.com',
     events: [OpencodeEventType.SESSION_CREATED],
-    transformPayload: (payload: BaseEventPayload) => payload,
+    transformPayload: (payload: BaseEventPayload) => ({
+      ...payload,
+      customField: 'value',
+    }),
   }],
 });
+
+export default MyPlugin;
 ```
+
+### Required Plugin Pattern
+
+All OpenCode plugins must follow this pattern:
+
+```typescript
+import type { Plugin } from '@opencode-ai/plugin';
+
+const MyPlugin: Plugin = /* your plugin implementation */;
+
+export default MyPlugin;
+```
+
+The `Plugin` type ensures OpenCode can properly initialize and run your plugin. The `@opencode-ai/plugin` module is provided by OpenCode's Bun runtime environment.
 
 ## Troubleshooting
 
 ### Enable Debug Logging
 
 ```typescript
-export default createWebhookPlugin({
+import type { Plugin } from '@opencode-ai/plugin';
+import { createWebhookPlugin } from 'opencode-webhooks';
+
+const DebugWebhook: Plugin = createWebhookPlugin({
   webhooks: [/* ... */],
   debug: true,  // Enable debug logging
 });
+
+export default DebugWebhook;
 ```
 
 Debug output includes:
@@ -332,25 +394,42 @@ Debug output includes:
 
 ### Common Issues
 
-**SIGTRAP errors or plugin not loading:**
-- The package must be installed locally in `~/.config/opencode/plugin/node_modules/`
-- Global npm installs (`npm install -g`) are not accessible to OpenCode's Bun runtime
-- Solution: Run `cd ~/.config/opencode/plugin && npm install opencode-webhooks`
-- Ensure the file is in `~/.config/opencode/plugin/`
-- Check the file has a `.ts` extension
-- Verify it exports a plugin using `export default`
+**Plugin not loading or SIGTRAP errors:**
+- ✅ **MUST install in parent directory**: `cd ~/.config/opencode/plugin && npm install opencode-webhooks`
+- ❌ **Global installs DON'T work**: Bun resolves from parent directory, not global paths
+- ✅ **Include Plugin type**: `import type { Plugin } from '@opencode-ai/plugin';`
+- ✅ **Use named export pattern**: 
+  ```typescript
+  const MyPlugin: Plugin = createWebhookPlugin({...});
+  export default MyPlugin;
+  ```
+- Check the file is in `~/.config/opencode/plugin/` with `.ts` extension
 - Restart OpenCode after making changes
+
+**Module resolution errors:**
+```
+Cannot find module 'opencode-webhooks'
+```
+- Bun looks for modules in the **parent directory** of your plugin file
+- Your plugin: `~/.config/opencode/plugin/my-webhook.ts`
+- Bun searches: `~/.config/opencode/plugin/node_modules/opencode-webhooks`
+- Solution: Ensure you ran `npm install` in `~/.config/opencode/plugin/`
+
+**@opencode-ai/plugin not found:**
+- This module is provided by OpenCode's runtime
+- Only use it as a type import: `import type { Plugin } from '@opencode-ai/plugin';`
+- Don't try to install it separately
 
 **Webhooks not sending:**
 - Check the webhook URL is correct
-- Enable debug mode to see detailed logs
+- Enable debug mode to see detailed logs: `debug: true`
 - Verify the events you're listening for are actually firing
 - Check network connectivity
 
-**Import errors:**
-- If installed locally in plugin directory: `import { createWebhookPlugin } from 'opencode-webhooks';`
-- If using local clone: `import { createWebhookPlugin } from './opencode-webhooks/src/index.ts';`
-- Make sure `package.json` exists in `~/.config/opencode/plugin/` (create with `npm init -y` if needed)
+**Import patterns:**
+- ✅ Installed via npm: `import { createWebhookPlugin } from 'opencode-webhooks';`
+- ✅ Local clone: `import { createWebhookPlugin } from './opencode-webhooks/src/index.js';`
+- Make sure `package.json` exists in `~/.config/opencode/plugin/` (create with `npm init -y`)
 
 ## License
 
