@@ -24,6 +24,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:bun": "bun test tests/integration.bun.test.ts",
     "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
     "lint:fix": "eslint 'src/**/*.ts' 'tests/**/*.ts' --fix"
   },
@@ -61,9 +62,13 @@
     "axios": "^1.6.0"
   },
   "peerDependencies": {
+    "@opencode-ai/plugin": "^1.0.0",
     "opencode": "*"
   },
   "peerDependenciesMeta": {
+    "@opencode-ai/plugin": {
+      "optional": true
+    },
     "opencode": {
       "optional": true
     }
