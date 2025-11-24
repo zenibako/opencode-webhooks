@@ -11,7 +11,8 @@
  * 4. Restart OpenCode
  */
 
-import { createWebhookPlugin } from './opencode-webhooks/src/index.ts';
+import type { Plugin } from '@opencode-ai/plugin';
+import { createWebhookPlugin } from './opencode-webhooks/src/index.js';
 
 // ============================================================================
 // Configuration
@@ -23,7 +24,8 @@ const WEBHOOK_URL = 'https://your-webhook-endpoint.com/api/events';
 // Plugin Setup
 // ============================================================================
 
-export default createWebhookPlugin({
+// Export the plugin with explicit type annotation for OpenCode
+const LocalDevPlugin: Plugin = createWebhookPlugin({
   webhooks: [
     {
       url: WEBHOOK_URL,
@@ -49,3 +51,5 @@ export default createWebhookPlugin({
   ],
   debug: true,
 });
+
+export default LocalDevPlugin;
