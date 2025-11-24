@@ -87,6 +87,15 @@ export interface WebhookConfig {
 
   /** Optional: Timeout in milliseconds */
   timeoutMs?: number;
+
+  /** Optional: Rate limiting configuration */
+  rateLimit?: {
+    /** Maximum number of requests per time window */
+    maxRequests: number;
+    
+    /** Time window in milliseconds (e.g., 60000 for 1 minute) */
+    windowMs: number;
+  };
 }
 
 /**
@@ -118,4 +127,5 @@ export interface WebhookResult {
   statusCode?: number;
   error?: string;
   attempts: number;
+  rateLimitDelayed?: boolean;
 }

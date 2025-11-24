@@ -14,6 +14,7 @@ Send webhook notifications for any OpenCode event. Perfect for integrating with 
 - 🔄 Custom payload transformations for each webhook
 - 🎛️ Filtering logic to control when webhooks are sent
 - ♻️ Automatic retry logic with exponential backoff
+- ⏱️ **Rate limiting & queuing** - Automatically queue events when rate limits are hit
 - 📝 Full TypeScript support
 - 🐛 Debug logging for troubleshooting
 - 💬 Built-in Slack Workflow Builder integration
@@ -188,6 +189,65 @@ export default CustomWebhook;
 
 ## Configuration
 
+### Rate Limiting & Queuing
+
+Slack webhooks have a limit of **10 requests per minute**. The plugin automatically queues events when you hit rate limits, sending them individually after the cooldown period:
+
+```typescript
+import type { Plugin } from '@opencode-ai/plugin';
+import { createWebhookPlugin } from 'opencode-webhooks';
+
+const SlackRateLimited: Plugin = createWebhookPlugin({
+  webhooks: [
+    {
+      url: 'https://hooks.slack.com/workflows/...',
+      events: ['session.created', 'session.error', 'file.edited'],
+      
+      // Rate limiting configuration
+      rateLimit: {
+        maxRequests: 10,        // Maximum requests per window
+        windowMs: 60000,        // Time window (1 minute)
+      },
+      
+      transformPayload: (payload) => {
+        return {
+          eventType: payload.eventType,
+          timestamp: payload.timestamp,
+          // All original event data is preserved
+        };
+      },
+    },
+  ],
+  debug: true,
+});
+
+export default SlackRateLimited;
+```
+
+**How it works:**
+1. First 10 events/minute are sent immediately
+2. Additional events are queued with their original timestamps
+3. After the rate limit window expires, queued events are sent individually
+4. Queued events include a `rateLimitDelayed: true` flag in the callback
+5. All event data is preserved exactly as it was when the event occurred
+
+**Handling queued events in callbacks:**
+```typescript
+const plugin = new WebhookPlugin({
+  webhooks: [{ url: '...', events: ['*'], rateLimit: { maxRequests: 10, windowMs: 60000 } }],
+  async onResult(event, results) {
+    for (const result of results) {
+      if (result.rateLimitDelayed) {
+        console.log('This event was delayed due to rate limiting');
+      }
+    }
+  },
+});
+```
+
+See [examples/slack-workflow-ratelimited.ts](./examples/slack-workflow-ratelimited.ts) for a complete working example.
+
+
 ### Basic Configuration
 
 ```typescript
@@ -274,6 +334,7 @@ export default AdvancedWebhook;
 The `examples/` directory contains ready-to-use configurations:
 
 - **[slack-workflow.ts](./examples/slack-workflow.ts)** - Slack Workflow Builder integration
+- **[slack-workflow-ratelimited.ts](./examples/slack-workflow-ratelimited.ts)** - Slack with rate limiting & queuing
 - **[custom-webhook.ts](./examples/custom-webhook.ts)** - Custom webhook endpoint
 - **[local-dev.ts](./examples/local-dev.ts)** - Local development setup
 

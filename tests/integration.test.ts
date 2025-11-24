@@ -5,7 +5,7 @@
 
 import axios from 'axios';
 import { WebhookPlugin } from '../src/index';
-import { OpencodeEventType, BaseEventPayload } from '../src/types';
+import { OpencodeEventType, BaseEventPayload, WebhookResult } from '../src/types';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.MockedFunction<typeof axios>;
@@ -261,6 +261,267 @@ describe('Webhook Plugin Integration Tests', () => {
     });
   });
 
+  describe('Slack webhook integration', () => {
+    it('should send to real Slack workflow webhook with debug enabled', async () => {
+      // Mock the Slack webhook response (Slack returns 200 OK for successful webhooks)
+      mockedAxios.mockResolvedValue({
+        status: 200,
+        data: 'ok', // Slack workflow webhooks typically return just "ok"
+      } as any);
+
+      const plugin = new WebhookPlugin({
+        webhooks: [
+          {
+            url: 'https://hooks.slack.com/triggers/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',
+            events: [
+              OpencodeEventType.SESSION_CREATED,
+              OpencodeEventType.SESSION_IDLE,
+              OpencodeEventType.SESSION_ERROR,
+            ],
+            transformPayload: (payload) => ({
+              eventType: payload.eventType,
+              sessionId: payload.sessionId || 'N/A',
+              timestamp: payload.timestamp,
+              message: `${payload.eventType} event triggered`,
+              eventInfo: JSON.stringify(payload, null, 2),
+            }),
+            retry: {
+              maxAttempts: 3,
+              delayMs: 1000,
+            },
+            timeoutMs: 5000,
+          },
+        ],
+        debug: true, // Enable debug mode
+      });
+
+      const payload: Partial<BaseEventPayload> = {
+        sessionId: 'test-session-123',
+        userId: 'user-456',
+      };
+
+      const results = await plugin.handleEvent(
+        OpencodeEventType.SESSION_CREATED,
+        payload
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0].success).toBe(true);
+      expect(results[0].statusCode).toBe(200);
+
+      // Verify debug logs were called
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[WebhookPlugin]')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Sending webhook to')
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Successfully sent webhook')
+      );
+
+      // Verify the correct payload was sent to Slack
+      expect(mockedAxios).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://hooks.slack.com/triggers/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',
+          method: 'POST',
+          data: expect.objectContaining({
+            eventType: OpencodeEventType.SESSION_CREATED,
+            sessionId: 'test-session-123',
+            message: expect.stringContaining('session.created'),
+          }),
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+          }),
+          timeout: 5000,
+        })
+      );
+    });
+
+    it('should handle Slack webhook with all event types', async () => {
+      mockedAxios.mockResolvedValue({
+        status: 200,
+        data: 'ok',
+      } as any);
+
+      const plugin = new WebhookPlugin({
+        webhooks: [
+          {
+            url: 'https://hooks.slack.com/triggers/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',
+            events: [
+              OpencodeEventType.SESSION_IDLE,
+              OpencodeEventType.SESSION_ERROR,
+              OpencodeEventType.FILE_EDITED,
+            ],
+            transformPayload: (payload) => ({
+              eventType: payload.eventType,
+              sessionId: payload.sessionId,
+              timestamp: payload.timestamp,
+              message: `Event: ${payload.eventType}`,
+            }),
+          },
+        ],
+        debug: true,
+      });
+
+      // Test SESSION_IDLE
+      await plugin.handleEvent(OpencodeEventType.SESSION_IDLE, {
+        sessionId: 'session-1',
+      });
+
+      // Test SESSION_ERROR
+      await plugin.handleEvent(OpencodeEventType.SESSION_ERROR, {
+        sessionId: 'session-1',
+        error: 'Test error',
+      });
+
+      // Test FILE_EDITED
+      await plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
+        sessionId: 'session-1',
+        filePath: '/test/file.ts',
+      });
+
+      expect(mockedAxios).toHaveBeenCalledTimes(3);
+    });
+
+    it('should retry on Slack webhook failure with debug logging', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // Simulate network failures then success
+      mockedAxios
+        .mockRejectedValueOnce({
+          message: 'Network timeout',
+          response: { status: 504 },
+        })
+        .mockRejectedValueOnce({
+          message: 'Service unavailable',
+          response: { status: 503 },
+        })
+        .mockResolvedValueOnce({
+          status: 200,
+          data: 'ok',
+        } as any);
+
+      const plugin = new WebhookPlugin({
+        webhooks: [
+          {
+            url: 'https://hooks.slack.com/triggers/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',
+            events: [OpencodeEventType.SESSION_CREATED],
+            retry: {
+              maxAttempts: 3,
+              delayMs: 100, // Short delay for testing
+            },
+          },
+        ],
+        debug: true,
+      });
+
+      const results = await plugin.handleEvent(OpencodeEventType.SESSION_CREATED, {
+        sessionId: 'test-session',
+      });
+
+      // Should eventually succeed on the third attempt
+      expect(results[0].success).toBe(true);
+      expect(mockedAxios).toHaveBeenCalledTimes(3);
+
+      // Verify debug error logs were called
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[WebhookPlugin] Attempt')
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('failed')
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle Slack webhook permanent failure', async () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      // All attempts fail
+      mockedAxios.mockRejectedValue({
+        message: 'Invalid webhook URL',
+        response: { status: 404 },
+      });
+
+      const plugin = new WebhookPlugin({
+        webhooks: [
+          {
+            url: 'https://hooks.slack.com/triggers/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',
+            events: [OpencodeEventType.SESSION_ERROR],
+            retry: {
+              maxAttempts: 2,
+              delayMs: 50,
+            },
+          },
+        ],
+        debug: true,
+      });
+
+      const results = await plugin.handleEvent(OpencodeEventType.SESSION_ERROR, {
+        sessionId: 'test-session',
+        error: 'Test error',
+      });
+
+      expect(results[0].success).toBe(false);
+      expect(results[0].error).toContain('Invalid webhook URL');
+      expect(results[0].attempts).toBe(2);
+      expect(mockedAxios).toHaveBeenCalledTimes(2);
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should send complex Slack message with blocks', async () => {
+      mockedAxios.mockResolvedValue({
+        status: 200,
+        data: 'ok',
+      } as any);
+
+      const plugin = new WebhookPlugin({
+        webhooks: [
+          {
+            url: 'https://hooks.slack.com/triggers/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',
+            events: [OpencodeEventType.SESSION_ERROR],
+            transformPayload: (payload) => {
+              const eventEmojis: Record<string, string> = {
+                'session.created': '🆕',
+                'session.idle': '💤',
+                'session.error': '❌',
+              };
+
+              const emoji = eventEmojis[payload.eventType] || '📢';
+
+              return {
+                eventType: payload.eventType,
+                sessionId: payload.sessionId || 'N/A',
+                timestamp: payload.timestamp,
+                message: `${emoji} ${payload.eventType}`,
+                eventInfo: `Error: ${(payload as any).error || 'Unknown'}`,
+                error: (payload as any).error,
+              };
+            },
+          },
+        ],
+        debug: true,
+      });
+
+      await plugin.handleEvent(OpencodeEventType.SESSION_ERROR, {
+        sessionId: 'session-123',
+        error: 'Connection timeout',
+      });
+
+      expect(mockedAxios).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            message: expect.stringContaining('❌'),
+            eventInfo: expect.stringContaining('Connection timeout'),
+            error: 'Connection timeout',
+          }),
+        })
+      );
+    });
+  });
+
   describe('Real-world scenarios', () => {
     it('should handle rapid successive events', async () => {
       mockedAxios.mockResolvedValue({
@@ -278,7 +539,7 @@ describe('Webhook Plugin Integration Tests', () => {
       });
 
       // Simulate rapid code changes
-      const promises = [];
+      const promises: Promise<WebhookResult[]>[] = [];
       for (let i = 0; i < 10; i++) {
         promises.push(
           plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
@@ -357,6 +618,100 @@ describe('Webhook Plugin Integration Tests', () => {
           }),
         })
       );
+    });
+
+    it('should queue events when rate limit is hit and send with delay flag', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2025-01-01T00:00:00.000Z'));
+      
+      mockedAxios.mockResolvedValue({
+        status: 200,
+        data: { success: true },
+      } as any);
+
+      const plugin = new WebhookPlugin({
+        webhooks: [
+          {
+            url: 'https://example.com/webhook',
+            events: [OpencodeEventType.FILE_EDITED],
+            transformPayload: (payload) => ({
+              file: (payload as any).filePath,
+              time: payload.timestamp,
+            }),
+            rateLimit: {
+              maxRequests: 2,
+              windowMs: 60000,
+            },
+          },
+        ],
+        debug: true,
+      });
+
+      // Send 2 events (under limit - should be sent immediately)
+      await plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
+        sessionId: 'session-1',
+        filePath: '/file1.ts',
+      });
+
+      await plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
+        sessionId: 'session-1',
+        filePath: '/file2.ts',
+      });
+
+      // These should be sent individually with transformation
+      expect(mockedAxios).toHaveBeenCalledTimes(2);
+      expect(mockedAxios).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            file: '/file1.ts',
+          }),
+        })
+      );
+
+      mockedAxios.mockClear();
+
+      // Send 2 more events (over limit - should be queued)
+      await plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
+        sessionId: 'session-1',
+        filePath: '/file3.ts',
+      });
+
+      await plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
+        sessionId: 'session-1',
+        filePath: '/file4.ts',
+      });
+
+      // Should not be sent immediately (queued)
+      expect(mockedAxios).not.toHaveBeenCalled();
+
+      // Advance timers to trigger queue flush (past the 60s window)
+      jest.runAllTimers();
+      // Wait for flush() while loop to complete both sends
+      for (let i = 0; i < 10; i++) {
+        await Promise.resolve();
+      }
+
+      // Should send queued events individually with original timestamps
+      expect(mockedAxios).toHaveBeenCalledTimes(2);
+      expect(mockedAxios).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            file: '/file3.ts',
+          }),
+        })
+      );
+      expect(mockedAxios).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            file: '/file4.ts',
+          }),
+        })
+      );
+
+      jest.useRealTimers();
+      plugin.destroy();
     });
   });
 });

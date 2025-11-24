@@ -7,6 +7,7 @@ import {
   WebhookResult,
 } from './types.js';
 import { WebhookClient } from './webhook-client.js';
+import { BatchHandler } from './batch-handler.js';
 
 /**
  * Opencode Webhook Plugin Class
@@ -16,11 +17,13 @@ export class WebhookPlugin {
   private config: WebhookPluginConfig;
   private client: WebhookClient;
   private eventHandlers: Map<OpencodeEventType, Set<WebhookConfig>>;
+  private batchHandlers: Map<string, BatchHandler>;
 
   constructor(config: WebhookPluginConfig) {
     this.config = config;
     this.client = new WebhookClient(config.debug);
     this.eventHandlers = new Map();
+    this.batchHandlers = new Map();
 
     this.indexWebhooks();
 
@@ -28,6 +31,7 @@ export class WebhookPlugin {
       console.log('[WebhookPlugin] Initialized with configuration:', {
         webhookCount: config.webhooks.length,
         events: this.getRegisteredEvents(),
+        rateLimitedWebhooks: config.webhooks.filter(w => w.rateLimit).length,
       });
     }
   }
@@ -40,7 +44,20 @@ export class WebhookPlugin {
         }
         this.eventHandlers.get(eventType as OpencodeEventType)!.add(webhook);
       }
+
+      // Create batch handler if rate limiting is configured
+      if (webhook.rateLimit) {
+        const key = this.getWebhookKey(webhook);
+        const sendCallback = async (payload: BaseEventPayload, rateLimitDelayed: boolean) => {
+          await this.sendWebhookDirect(webhook, payload, rateLimitDelayed);
+        };
+        this.batchHandlers.set(key, new BatchHandler(webhook, sendCallback, this.config.debug));
+      }
     }
+  }
+
+  private getWebhookKey(webhook: WebhookConfig): string {
+    return `${webhook.url}:${webhook.events.join(',')}`;
   }
 
   private getRegisteredEvents(): string[] {
@@ -68,7 +85,7 @@ export class WebhookPlugin {
     }
 
     const webhookPromises = Array.from(webhooks).map((webhook) =>
-      this.sendWebhook(webhook, fullPayload)
+      this.processWebhook(webhook, fullPayload)
     );
 
     const results = await Promise.allSettled(webhookPromises);
@@ -87,10 +104,11 @@ export class WebhookPlugin {
     });
   }
 
-  private async sendWebhook(
+  private async processWebhook(
     webhook: WebhookConfig,
     payload: BaseEventPayload
   ): Promise<WebhookResult> {
+    // Check shouldSend filter
     if (webhook.shouldSend && !webhook.shouldSend(payload)) {
       if (this.config.debug) {
         console.log(
@@ -104,6 +122,56 @@ export class WebhookPlugin {
       };
     }
 
+    // Check if rate limiting is enabled
+    if (webhook.rateLimit) {
+      const key = this.getWebhookKey(webhook);
+      const batchHandler = this.batchHandlers.get(key);
+      
+      if (batchHandler) {
+        // Add to queue (will be sent later if rate limited)
+        await batchHandler.addEvent(payload);
+        
+        return {
+          success: true,
+          webhookUrl: webhook.url,
+          attempts: 0,
+        };
+      }
+    }
+
+    // No rate limiting, send immediately
+    return this.sendWebhook(webhook, payload);
+  }
+
+  private async sendWebhookDirect(
+    webhook: WebhookConfig,
+    payload: BaseEventPayload,
+    rateLimitDelayed: boolean
+  ): Promise<WebhookResult> {
+    const webhookWithDefaults: WebhookConfig = {
+      ...webhook,
+      timeoutMs: webhook.timeoutMs ?? this.config.defaultTimeoutMs,
+      retry: {
+        maxAttempts:
+          webhook.retry?.maxAttempts ?? this.config.defaultRetry?.maxAttempts ?? 3,
+        delayMs: webhook.retry?.delayMs ?? this.config.defaultRetry?.delayMs ?? 1000,
+      },
+    };
+
+    const result = await this.client.send(webhookWithDefaults, payload);
+    
+    // Add rate limit delay flag if applicable
+    if (rateLimitDelayed) {
+      result.rateLimitDelayed = true;
+    }
+    
+    return result;
+  }
+
+  private async sendWebhook(
+    webhook: WebhookConfig,
+    payload: BaseEventPayload
+  ): Promise<WebhookResult> {
     const webhookWithDefaults: WebhookConfig = {
       ...webhook,
       timeoutMs: webhook.timeoutMs ?? this.config.defaultTimeoutMs,
@@ -115,6 +183,16 @@ export class WebhookPlugin {
     };
 
     return this.client.send(webhookWithDefaults, payload);
+  }
+
+  /**
+   * Cleanup batch handlers on shutdown
+   */
+  destroy(): void {
+    for (const handler of this.batchHandlers.values()) {
+      handler.destroy();
+    }
+    this.batchHandlers.clear();
   }
 }
 
@@ -138,3 +216,4 @@ export function createWebhookPlugin(config: WebhookPluginConfig): Plugin {
 // Export types for consumers
 export * from './types.js';
 export { WebhookClient } from './webhook-client.js';
+export { BatchHandler } from './batch-handler.js';
