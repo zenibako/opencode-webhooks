@@ -18,6 +18,7 @@
  * Full guide: https://slack.com/help/articles/360041352714
  */
 
+import type { Plugin } from '@opencode-ai/plugin';
 import { createWebhookPlugin } from 'opencode-webhooks';
 
 // ============================================================================
@@ -30,7 +31,8 @@ const WEBHOOK_URL = 'https://hooks.slack.com/workflows/T00000000/A00000000/12345
 // Plugin Setup
 // ============================================================================
 
-export default createWebhookPlugin({
+// Export the plugin with explicit type annotation for OpenCode
+const SlackWorkflowPlugin: Plugin = createWebhookPlugin({
   webhooks: [
     {
       url: WEBHOOK_URL,
@@ -78,13 +80,13 @@ export default createWebhookPlugin({
         
         // Flatten payload to top level for Slack Workflow Builder
         return {
+          ...payload,
           eventType: payload.eventType,
           sessionId: payload.sessionId || 'N/A',
           timestamp: payload.timestamp,
           message: `${emoji} ${payload.eventType}`,
           eventInfo: `${description}${messagePreview}\n\nAvailable data: ${availableKeys.join(', ')}`,
           messageContent: messageContent,
-          ...payload,
         };
       },
       
@@ -101,3 +103,5 @@ export default createWebhookPlugin({
   // Enable debug logging (set to false in production)
   debug: false,
 });
+
+export default SlackWorkflowPlugin;

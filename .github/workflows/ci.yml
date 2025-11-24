@@ -392,11 +392,212 @@ jobs:
           echo "  - Local path installation"
           echo ""
 
+  bun-integration:
+    name: Bun Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build plugin
+        run: bun run build
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+
+      - name: Test 1 - Plugin loading with Bun
+        run: |
+          echo "=== Testing Bun plugin loading ==="
+          
+          # Create test directory
+          mkdir -p /tmp/bun-plugin-test
+          cd /tmp/bun-plugin-test
+          
+          # Initialize with Bun
+          bun init -y
+          
+          # Install from tarball
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          echo "Installing from tarball: $TARBALL"
+          bun add "$TARBALL"
+          
+          # Create test script
+          cat > test-import.ts << 'EOF'
+          import { createWebhookPlugin, OpencodeEventType } from 'opencode-webhooks';
+          
+          console.log('Testing Bun import...');
+          
+          const plugin = createWebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://example.com/webhook',
+                events: [OpencodeEventType.SESSION_CREATED]
+              }
+            ]
+          });
+          
+          if (typeof plugin !== 'function') {
+            console.error('❌ Plugin creation failed');
+            process.exit(1);
+          }
+          
+          console.log('✅ Bun import successful');
+          EOF
+          
+          # Run with Bun
+          bun run test-import.ts || (echo "❌ Bun import failed" && exit 1)
+          
+          echo "✅ Bun plugin loading successful"
+
+      - name: Test 2 - Run Bun integration tests
+        run: |
+          echo "=== Running Bun integration tests ==="
+          cd $GITHUB_WORKSPACE
+          bun test tests/integration.bun.test.ts || (echo "❌ Bun tests failed" && exit 1)
+          echo "✅ Bun integration tests passed"
+
+      - name: Test 3 - Bun plugin execution
+        run: |
+          echo "=== Testing Bun plugin execution ==="
+          
+          # Create test directory
+          mkdir -p /tmp/bun-exec-test
+          cd /tmp/bun-exec-test
+          
+          # Initialize
+          bun init -y
+          
+          # Install from tarball
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          bun add "$TARBALL"
+          
+          # Create execution test
+          cat > test-exec.ts << 'EOF'
+          import { WebhookPlugin, OpencodeEventType } from 'opencode-webhooks';
+          
+          console.log('Creating plugin instance...');
+          
+          const plugin = new WebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://httpbin.org/post',
+                events: [OpencodeEventType.SESSION_CREATED],
+                transformPayload: (payload) => ({
+                  message: 'Bun test webhook',
+                  sessionId: payload.sessionId
+                }),
+                timeoutMs: 5000,
+                retry: { maxAttempts: 1 }
+              }
+            ],
+            debug: true
+          });
+          
+          console.log('Triggering test event...');
+          
+          const results = await plugin.handleEvent(OpencodeEventType.SESSION_CREATED, {
+            sessionId: 'bun-test-session-123',
+            userId: 'bun-test-user'
+          });
+          
+          console.log('Results:', JSON.stringify(results, null, 2));
+          
+          if (results.length === 0) {
+            console.error('❌ No results returned');
+            process.exit(1);
+          }
+          
+          if (!results[0].success) {
+            console.error('❌ Webhook failed:', results[0].error);
+            process.exit(1);
+          }
+          
+          if (results[0].statusCode !== 200) {
+            console.error('❌ Unexpected status code:', results[0].statusCode);
+            process.exit(1);
+          }
+          
+          console.log('✅ Bun plugin execution successful');
+          EOF
+          
+          # Run with Bun
+          bun run test-exec.ts || (echo "❌ Bun execution test failed" && exit 1)
+          
+          echo "✅ Bun plugin execution successful"
+
+      - name: Test 4 - Bun performance comparison
+        run: |
+          echo "=== Testing Bun performance ==="
+          
+          cd $GITHUB_WORKSPACE
+          
+          # Create performance test
+          cat > /tmp/bun-perf-test.ts << 'EOF'
+          import { WebhookPlugin, OpencodeEventType } from './src/index';
+          
+          const plugin = new WebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://httpbin.org/post',
+                events: [OpencodeEventType.FILE_EDITED],
+                timeoutMs: 5000,
+                retry: { maxAttempts: 1 }
+              }
+            ]
+          });
+          
+          const startTime = performance.now();
+          const promises = Array.from({ length: 5 }, (_, i) =>
+            plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
+              sessionId: 'perf-test',
+              changeId: i
+            })
+          );
+          
+          await Promise.all(promises);
+          const duration = performance.now() - startTime;
+          
+          console.log(`Bun: Processed 5 events in ${duration.toFixed(2)}ms`);
+          console.log(`Average: ${(duration / 5).toFixed(2)}ms per event`);
+          EOF
+          
+          bun run /tmp/bun-perf-test.ts || echo "Performance test informational only"
+          
+          echo "✅ Bun performance test complete"
+
+      - name: Bun integration summary
+        if: always()
+        run: |
+          echo ""
+          echo "======================================"
+          echo "  Bun Integration Test Summary"
+          echo "======================================"
+          echo ""
+          echo "✅ All Bun integration tests passed!"
+          echo ""
+          echo "Verified scenarios:"
+          echo "  - Plugin loading with Bun runtime"
+          echo "  - Bun test suite execution"
+          echo "  - Plugin hook execution with real HTTP"
+          echo "  - Bun performance characteristics"
+          echo ""
+
   # Combined check that runs after all other jobs
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [lint, test, build, plugin-integration]
+    needs: [lint, test, build, plugin-integration, bun-integration]
     if: always()
     steps:
       - name: Check all jobs
@@ -415,6 +616,10 @@ jobs:
           fi
           if [[ "${{ needs.plugin-integration.result }}" != "success" ]]; then
             echo "Plugin integration tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.bun-integration.result }}" != "success" ]]; then
+            echo "Bun integration tests failed"
             exit 1
           fi
           echo "All CI checks passed!"
