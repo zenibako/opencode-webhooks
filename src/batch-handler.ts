@@ -6,7 +6,7 @@ import { BaseEventPayload, WebhookConfig } from './types.js';
 export class BatchHandler {
   private queue: BaseEventPayload[] = [];
   private requestTimestamps: number[] = [];
-  private flushTimer: NodeJS.Timeout | null = null;
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private debug: boolean;
 
   constructor(
