@@ -1,0 +1,32 @@
+# OpenCode Webhook Test
+
+This file was created to test the new agent completion notification system.
+
+## What Just Happened
+
+The OpenCode agent completed a task (creating this file), which should trigger:
+
+1. A mobile notification on your iPhone
+2. A persistent notification in Home Assistant with full details
+3. A logbook entry
+
+## Payload Details
+
+The webhook sent includes:
+- Session title (likely the project folder name "opencode-webhooks")
+- This complete message text
+- Token usage statistics
+- Cost information
+- Timestamp
+
+## Expected Results
+
+You should receive a notification that says something like:
+- **Title**: "OpenCode: opencode-webhooks"
+- **Message**: "I'll create a simple test file to demonstrate the new webhook functionality!..."
+
+Check your Home Assistant notifications for the full message!
+
+---
+
+Test completed at: 2025-12-09
