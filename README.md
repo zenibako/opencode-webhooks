@@ -335,6 +335,8 @@ The `examples/` directory contains ready-to-use configurations:
 
 - **[slack-workflow.ts](./examples/slack-workflow.ts)** - Slack Workflow Builder integration
 - **[slack-workflow-ratelimited.ts](./examples/slack-workflow-ratelimited.ts)** - Slack with rate limiting & queuing
+- **[n8n.ts](./examples/n8n.ts)** - n8n workflow automation integration
+- **[home-assistant.ts](./examples/home-assistant.ts)** - Home Assistant webhook integration
 - **[custom-webhook.ts](./examples/custom-webhook.ts)** - Custom webhook endpoint
 - **[local-dev.ts](./examples/local-dev.ts)** - Local development setup
 
