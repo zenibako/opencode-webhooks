@@ -1,0 +1,229 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify version matches release tag
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          RELEASE_TAG=${{ github.event.release.tag_name }}
+          # Remove 'v' prefix if present
+          RELEASE_VERSION=${RELEASE_TAG#v}
+
+          echo "Package version: $PACKAGE_VERSION"
+          echo "Release version: $RELEASE_VERSION"
+
+          if [ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "❌ Version mismatch! Package version ($PACKAGE_VERSION) doesn't match release tag ($RELEASE_VERSION)"
+            exit 1
+          fi
+          echo "✅ Version verification passed"
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Create package
+        run: |
+          npm pack
+          echo "TARBALL=$(ls *.tgz)" >> $GITHUB_ENV
+
+      - name: Publish to NPM
+        run: |
+          echo "Publishing ${{ env.TARBALL }} to npm..."
+          npm publish --provenance --access public
+
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          echo "✅ Successfully published ${PACKAGE_NAME}@${PACKAGE_VERSION} to npm"
+          echo "📦 View on npm: https://www.npmjs.com/package/${PACKAGE_NAME}/v/${PACKAGE_VERSION}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify package on NPM
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Waiting 10 seconds for npm registry to update..."
+          sleep 10
+
+          echo "Verifying package is available on npm..."
+          npm view ${PACKAGE_NAME}@${PACKAGE_VERSION} version || {
+            echo "⚠️  Package not yet available on npm registry (this can take a few minutes)"
+            exit 0
+          }
+
+          echo "✅ Package verified on npm registry"
+
+      - name: Upload release assets
+        run: |
+          # Upload the tarball
+          gh release upload "${{ github.event.release.tag_name }}" "${{ env.TARBALL }}" --clobber
+
+          # Create additional archive with source
+          tar -czf opencode-webhook-plugin-source.tar.gz dist/ src/ package.json README.md LICENSE
+          gh release upload "${{ github.event.release.tag_name }}" opencode-webhook-plugin-source.tar.gz --clobber
+
+          echo "✅ Release assets uploaded"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release summary
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # Release Summary
+
+          ## Package Information
+          - **Name**: \`${PACKAGE_NAME}\`
+          - **Version**: \`${PACKAGE_VERSION}\`
+          - **Release Tag**: \`${{ github.event.release.tag_name }}\`
+
+          ## Published To
+          - 📦 [npm Registry](https://www.npmjs.com/package/${PACKAGE_NAME}/v/${PACKAGE_VERSION})
+          - 🏷️ [GitHub Release](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.release.tag_name }})
+
+          ## Installation
+          \`\`\`bash
+          npm install ${PACKAGE_NAME}@${PACKAGE_VERSION}
+          \`\`\`
+
+          ## Assets
+          - \`${{ env.TARBALL }}\` - NPM package
+          - \`opencode-webhook-plugin-source.tar.gz\` - Package with source code
+          EOF
+
+  publish-gpr:
+    name: Publish to GitHub Packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@zenibako'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify version matches release tag
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          RELEASE_TAG=${{ github.event.release.tag_name }}
+          # Remove 'v' prefix if present
+          RELEASE_VERSION=${RELEASE_TAG#v}
+
+          echo "Package version: $PACKAGE_VERSION"
+          echo "Release version: $RELEASE_VERSION"
+
+          if [ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "❌ Version mismatch! Package version ($PACKAGE_VERSION) doesn't match release tag ($RELEASE_VERSION)"
+            exit 1
+          fi
+          echo "✅ Version verification passed"
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure package for GitHub Packages
+        run: |
+          # Update package.json to use GitHub Packages scope
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          pkg.name = '@zenibako/opencode-webhooks';
+          pkg.publishConfig = {
+            registry: 'https://npm.pkg.github.com',
+            access: 'public'
+          };
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Publish to GitHub Packages
+        run: |
+          echo "Publishing to GitHub Packages..."
+          npm publish --provenance
+          
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          
+          echo "✅ Successfully published @zenibako/opencode-webhooks@${PACKAGE_VERSION} to GitHub Packages"
+          echo "📦 View on GitHub Packages: https://github.com/zenibako/opencode-webhooks/pkgs/npm/opencode-webhooks"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Packages summary
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # GitHub Packages Release Summary
+
+          ## Package Information
+          - **Name**: \`@zenibako/opencode-webhooks\`
+          - **Version**: \`${PACKAGE_VERSION}\`
+          - **Release Tag**: \`${{ github.event.release.tag_name }}\`
+
+          ## Published To
+          - 📦 [GitHub Packages](https://github.com/zenibako/opencode-webhooks/pkgs/npm/opencode-webhooks)
+
+          ## Installation
+          \`\`\`bash
+          # Add to .npmrc:
+          @zenibako:registry=https://npm.pkg.github.com
+          
+          # Install:
+          npm install @zenibako/opencode-webhooks@${PACKAGE_VERSION}
+          \`\`\`
+
+          ## Authentication
+          To install from GitHub Packages, you need to authenticate:
+          \`\`\`bash
+          npm login --scope=@zenibako --auth-type=legacy --registry=https://npm.pkg.github.com
+          \`\`\`
+          EOF

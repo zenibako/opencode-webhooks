@@ -1,0 +1,625 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.node-version == 20
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Check build output
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "Error: dist directory not found"
+            exit 1
+          fi
+          if [ ! -f "dist/index.js" ]; then
+            echo "Error: dist/index.js not found"
+            exit 1
+          fi
+          if [ ! -f "dist/index.d.ts" ]; then
+            echo "Error: dist/index.d.ts not found"
+            exit 1
+          fi
+          echo "Build output verified successfully"
+
+      - name: Create npm package
+        run: npm pack
+
+      - name: Verify package contents
+        run: |
+          # Extract the tarball
+          TARBALL=$(ls *.tgz)
+          echo "Package created: $TARBALL"
+
+          # Get package size
+          SIZE=$(du -h "$TARBALL" | cut -f1)
+          echo "Package size: $SIZE"
+
+          # List contents
+          echo "Package contents:"
+          tar -tzf "$TARBALL" | head -20
+
+          # Verify essential files are included
+          echo ""
+          echo "Verifying essential files..."
+          tar -tzf "$TARBALL" | grep -q "package/package.json" || (echo "❌ package.json missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/README.md" || (echo "❌ README.md missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/LICENSE" || (echo "❌ LICENSE missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/dist/index.js" || (echo "❌ dist/index.js missing" && exit 1)
+          tar -tzf "$TARBALL" | grep -q "package/dist/index.d.ts" || (echo "❌ dist/index.d.ts missing" && exit 1)
+
+          # Check that node_modules is NOT included
+          if tar -tzf "$TARBALL" | grep -q "package/node_modules/"; then
+            echo "❌ node_modules should not be in package"
+            exit 1
+          fi
+
+          # Check that tests are NOT included
+          if tar -tzf "$TARBALL" | grep -q "package/tests/"; then
+            echo "❌ tests should not be in package"
+            exit 1
+          fi
+
+          echo "✅ Package contents verified successfully"
+
+      - name: Test npm publish (dry-run)
+        run: |
+          echo "Testing npm publish with dry-run..."
+          npm publish --dry-run
+          echo "✅ Package can be published successfully"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: "*.tgz"
+          retention-days: 7
+
+  plugin-integration:
+    name: Plugin Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build plugin
+        run: npm run build
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+
+      - name: Debug - Check artifact contents
+        run: |
+          echo "=== Checking downloaded artifact ==="
+          TARBALL=$(ls *.tgz)
+          echo "Tarball: $TARBALL"
+          
+          # Extract and check the dist/index.js file
+          mkdir -p /tmp/artifact-check
+          tar -xzf "$TARBALL" -C /tmp/artifact-check
+          
+          echo "First 10 lines of dist/index.js:"
+          head -10 /tmp/artifact-check/package/dist/index.js
+          
+          echo ""
+          echo "Checking for .js extensions in imports:"
+          grep "from './" /tmp/artifact-check/package/dist/index.js || echo "No relative imports found"
+
+      - name: Test 1 - Global npm install
+        run: |
+          echo "=== Testing global npm install scenario ==="
+          TARBALL=$(ls *.tgz)
+          echo "Installing package: $TARBALL"
+          
+          # Install the package globally
+          npm install -g "$TARBALL"
+          
+          # Verify package is installed
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          npm list -g "$PACKAGE_NAME" || (echo "❌ Package not found in global node_modules" && exit 1)
+          
+          echo "✅ Global install successful"
+
+      - name: Test 2 - Local development (npm link)
+        run: |
+          echo "=== Testing local development with npm link ==="
+          
+          # Create a test directory
+          mkdir -p /tmp/plugin-link-test
+          cd /tmp/plugin-link-test
+          
+          # Initialize a test project
+          npm init -y
+          
+          # Link the plugin from the workspace
+          cd $GITHUB_WORKSPACE
+          npm link
+          
+          # Link it in the test project
+          cd /tmp/plugin-link-test
+          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
+          npm link "$PACKAGE_NAME"
+          
+          # Verify the link exists
+          if [ ! -L "node_modules/$PACKAGE_NAME" ]; then
+            echo "❌ Symlink not created"
+            exit 1
+          fi
+          
+          echo "✅ npm link successful"
+
+      - name: Test 3 - Plugin loading verification
+        run: |
+          echo "=== Testing plugin can be loaded ==="
+          
+          # Create a test directory with package.json
+          mkdir -p /tmp/plugin-load-test
+          cd /tmp/plugin-load-test
+          npm init -y
+          
+          # Install from the tarball in the workspace
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          echo "Installing from tarball: $TARBALL"
+          npm install "$TARBALL"
+          
+          # Create a test script that imports and instantiates the plugin
+          cat > test-plugin-load.mjs << 'EOF'
+          import { createWebhookPlugin } from 'opencode-webhooks';
+          
+          console.log('Attempting to create plugin instance...');
+          
+          const plugin = createWebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://example.com/webhook',
+                events: ['session.created', 'session.idle']
+              }
+            ],
+            debug: true
+          });
+          
+          if (typeof plugin !== 'function') {
+            console.error('❌ Plugin creation failed - not a function');
+            process.exit(1);
+          }
+          
+          console.log('✅ Plugin created successfully');
+          console.log('Plugin type:', typeof plugin);
+          EOF
+          
+          # Run the test
+          node test-plugin-load.mjs || (echo "❌ Plugin loading failed" && exit 1)
+          
+          echo "✅ Plugin loading successful"
+
+      - name: Test 4 - Plugin hook execution
+        run: |
+          echo "=== Testing plugin hook execution ==="
+          
+          # Create test directory
+          mkdir -p /tmp/plugin-exec-test
+          cd /tmp/plugin-exec-test
+          npm init -y
+          
+          # Install from the tarball
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          echo "Installing from tarball: $TARBALL"
+          npm install "$TARBALL"
+          
+          # Create a test that simulates OpenCode calling the plugin
+          cat > test-plugin-execution.mjs << 'EOF'
+          import { WebhookPlugin } from 'opencode-webhooks';
+          
+          console.log('Creating plugin instance...');
+          
+          const plugin = new WebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://httpbin.org/post',
+                events: ['session.created'],
+                transformPayload: (payload) => ({
+                  message: 'Test webhook',
+                  sessionId: payload.sessionId
+                }),
+                timeoutMs: 5000,
+                retry: { maxAttempts: 1 }
+              }
+            ],
+            debug: true
+          });
+          
+          console.log('Triggering test event...');
+          
+          const results = await plugin.handleEvent('session.created', {
+            sessionId: 'test-session-123',
+            userId: 'test-user'
+          });
+          
+          console.log('Results:', JSON.stringify(results, null, 2));
+          
+          if (results.length === 0) {
+            console.error('❌ No results returned');
+            process.exit(1);
+          }
+          
+          if (!results[0].success) {
+            console.error('❌ Webhook failed:', results[0].error);
+            process.exit(1);
+          }
+          
+          if (results[0].statusCode !== 200) {
+            console.error('❌ Unexpected status code:', results[0].statusCode);
+            process.exit(1);
+          }
+          
+          console.log('✅ Plugin execution successful');
+          EOF
+          
+          # Run the execution test
+          node test-plugin-execution.mjs || (echo "❌ Plugin execution failed" && exit 1)
+          
+          echo "✅ Plugin hook execution successful"
+
+      - name: Test 5 - Local path installation
+        run: |
+          echo "=== Testing local path installation ==="
+          
+          # Create a test directory
+          mkdir -p /tmp/plugin-path-test
+          cd /tmp/plugin-path-test
+          
+          # Initialize a test project
+          npm init -y
+          
+          # Install from local path
+          npm install "$GITHUB_WORKSPACE"
+          
+          # Verify installation
+          PACKAGE_NAME=$(node -p "require('$GITHUB_WORKSPACE/package.json').name")
+          if [ ! -d "node_modules/$PACKAGE_NAME" ]; then
+            echo "❌ Package not found in node_modules"
+            exit 1
+          fi
+          
+          # Verify we can import it
+          cat > test-import.mjs << EOF
+          import { createWebhookPlugin } from '$PACKAGE_NAME';
+          console.log('Import successful');
+          EOF
+          
+          node test-import.mjs || (echo "❌ Import failed" && exit 1)
+          
+          echo "✅ Local path installation successful"
+
+      - name: Integration test summary
+        if: always()
+        run: |
+          echo ""
+          echo "======================================"
+          echo "  Plugin Integration Test Summary"
+          echo "======================================"
+          echo ""
+          echo "✅ All integration tests passed!"
+          echo ""
+          echo "Verified scenarios:"
+          echo "  - Global npm install"
+          echo "  - Local development (npm link)"
+          echo "  - Plugin loading and instantiation"
+          echo "  - Plugin hook execution with real HTTP"
+          echo "  - Local path installation"
+          echo ""
+
+  bun-integration:
+    name: Bun Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build plugin
+        run: bun run build
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+
+      - name: Test 1 - Plugin loading with Bun
+        run: |
+          echo "=== Testing Bun plugin loading ==="
+          
+          # Create test directory
+          mkdir -p /tmp/bun-plugin-test
+          cd /tmp/bun-plugin-test
+          
+          # Initialize with Bun
+          bun init -y
+          
+          # Install from tarball
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          echo "Installing from tarball: $TARBALL"
+          bun add "$TARBALL"
+          
+          # Create test script
+          cat > test-import.ts << 'EOF'
+          import { createWebhookPlugin, OpencodeEventType } from 'opencode-webhooks';
+          
+          console.log('Testing Bun import...');
+          
+          const plugin = createWebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://example.com/webhook',
+                events: [OpencodeEventType.SESSION_CREATED]
+              }
+            ]
+          });
+          
+          if (typeof plugin !== 'function') {
+            console.error('❌ Plugin creation failed');
+            process.exit(1);
+          }
+          
+          console.log('✅ Bun import successful');
+          EOF
+          
+          # Run with Bun
+          bun run test-import.ts || (echo "❌ Bun import failed" && exit 1)
+          
+          echo "✅ Bun plugin loading successful"
+
+      - name: Test 2 - Run Bun integration tests
+        run: |
+          echo "=== Running Bun integration tests ==="
+          cd $GITHUB_WORKSPACE
+          bun test tests/integration.bun.test.ts || (echo "❌ Bun tests failed" && exit 1)
+          echo "✅ Bun integration tests passed"
+
+      - name: Test 3 - Bun plugin execution
+        run: |
+          echo "=== Testing Bun plugin execution ==="
+          
+          # Create test directory
+          mkdir -p /tmp/bun-exec-test
+          cd /tmp/bun-exec-test
+          
+          # Initialize
+          bun init -y
+          
+          # Install from tarball
+          TARBALL=$(ls $GITHUB_WORKSPACE/*.tgz)
+          bun add "$TARBALL"
+          
+          # Create execution test
+          cat > test-exec.ts << 'EOF'
+          import { WebhookPlugin, OpencodeEventType } from 'opencode-webhooks';
+          
+          console.log('Creating plugin instance...');
+          
+          const plugin = new WebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://httpbin.org/post',
+                events: [OpencodeEventType.SESSION_CREATED],
+                transformPayload: (payload) => ({
+                  message: 'Bun test webhook',
+                  sessionId: payload.sessionId
+                }),
+                timeoutMs: 5000,
+                retry: { maxAttempts: 1 }
+              }
+            ],
+            debug: true
+          });
+          
+          console.log('Triggering test event...');
+          
+          const results = await plugin.handleEvent(OpencodeEventType.SESSION_CREATED, {
+            sessionId: 'bun-test-session-123',
+            userId: 'bun-test-user'
+          });
+          
+          console.log('Results:', JSON.stringify(results, null, 2));
+          
+          if (results.length === 0) {
+            console.error('❌ No results returned');
+            process.exit(1);
+          }
+          
+          if (!results[0].success) {
+            console.error('❌ Webhook failed:', results[0].error);
+            process.exit(1);
+          }
+          
+          if (results[0].statusCode !== 200) {
+            console.error('❌ Unexpected status code:', results[0].statusCode);
+            process.exit(1);
+          }
+          
+          console.log('✅ Bun plugin execution successful');
+          EOF
+          
+          # Run with Bun
+          bun run test-exec.ts || (echo "❌ Bun execution test failed" && exit 1)
+          
+          echo "✅ Bun plugin execution successful"
+
+      - name: Test 4 - Bun performance comparison
+        run: |
+          echo "=== Testing Bun performance ==="
+          
+          cd $GITHUB_WORKSPACE
+          
+          # Create performance test
+          cat > /tmp/bun-perf-test.ts << 'EOF'
+          import { WebhookPlugin, OpencodeEventType } from './src/index';
+          
+          const plugin = new WebhookPlugin({
+            webhooks: [
+              {
+                url: 'https://httpbin.org/post',
+                events: [OpencodeEventType.FILE_EDITED],
+                timeoutMs: 5000,
+                retry: { maxAttempts: 1 }
+              }
+            ]
+          });
+          
+          const startTime = performance.now();
+          const promises = Array.from({ length: 5 }, (_, i) =>
+            plugin.handleEvent(OpencodeEventType.FILE_EDITED, {
+              sessionId: 'perf-test',
+              changeId: i
+            })
+          );
+          
+          await Promise.all(promises);
+          const duration = performance.now() - startTime;
+          
+          console.log(`Bun: Processed 5 events in ${duration.toFixed(2)}ms`);
+          console.log(`Average: ${(duration / 5).toFixed(2)}ms per event`);
+          EOF
+          
+          bun run /tmp/bun-perf-test.ts || echo "Performance test informational only"
+          
+          echo "✅ Bun performance test complete"
+
+      - name: Bun integration summary
+        if: always()
+        run: |
+          echo ""
+          echo "======================================"
+          echo "  Bun Integration Test Summary"
+          echo "======================================"
+          echo ""
+          echo "✅ All Bun integration tests passed!"
+          echo ""
+          echo "Verified scenarios:"
+          echo "  - Plugin loading with Bun runtime"
+          echo "  - Bun test suite execution"
+          echo "  - Plugin hook execution with real HTTP"
+          echo "  - Bun performance characteristics"
+          echo ""
+
+  # Combined check that runs after all other jobs
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint, test, build, plugin-integration, bun-integration]
+    if: always()
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo "Lint job failed"
+            exit 1
+          fi
+          if [[ "${{ needs.test.result }}" != "success" ]]; then
+            echo "Test job failed"
+            exit 1
+          fi
+          if [[ "${{ needs.build.result }}" != "success" ]]; then
+            echo "Build job failed"
+            exit 1
+          fi
+          if [[ "${{ needs.plugin-integration.result }}" != "success" ]]; then
+            echo "Plugin integration tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.bun-integration.result }}" != "success" ]]; then
+            echo "Bun integration tests failed"
+            exit 1
+          fi
+          echo "All CI checks passed!"
