@@ -717,4 +717,460 @@ describe('AgentCompletionMiddleware', () => {
       expect(onCompleteMock).not.toHaveBeenCalled();
     });
   });
+
+  describe('idle delay functionality', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should send webhook immediately when idleDelaySecs is 0', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        idleDelaySecs: 0,
+        onComplete: onCompleteMock,
+      });
+
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'Test message',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      expect(onCompleteMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should send webhook immediately when idleDelaySecs is not set', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        onComplete: onCompleteMock,
+      });
+
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'Test message',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      expect(onCompleteMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should delay webhook sending when idleDelaySecs is set', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        idleDelaySecs: 5,
+        onComplete: onCompleteMock,
+      });
+
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'Test message',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      // Should not be called immediately
+      expect(onCompleteMock).not.toHaveBeenCalled();
+
+      // Fast forward 5 seconds
+      jest.advanceTimersByTime(5000);
+
+      // Wait for async callbacks
+      await Promise.resolve();
+
+      // Should be called after delay
+      expect(onCompleteMock).toHaveBeenCalledTimes(1);
+      expect(onCompleteMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageContent: 'Test message',
+        })
+      );
+    });
+
+    it('should cancel pending webhook when message.part.updated occurs during delay', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        idleDelaySecs: 5,
+        onComplete: onCompleteMock,
+      });
+
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'First part',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      // Fast forward 2 seconds (not enough to trigger)
+      jest.advanceTimersByTime(2000);
+
+      // New activity - should cancel pending webhook
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p2',
+            type: 'text',
+            text: 'Second part',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      // Fast forward remaining time
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+
+      // Should not be called since it was cancelled
+      expect(onCompleteMock).not.toHaveBeenCalled();
+    });
+
+    it('should cancel pending webhook when message.updated occurs during delay', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        idleDelaySecs: 5,
+        onComplete: onCompleteMock,
+      });
+
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'Test',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      // Fast forward 2 seconds
+      jest.advanceTimersByTime(2000);
+
+      // New message - should cancel pending webhook
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm2',
+          },
+        },
+      });
+
+      // Fast forward remaining time
+      jest.advanceTimersByTime(5000);
+      await Promise.resolve();
+
+      // Should not be called since it was cancelled
+      expect(onCompleteMock).not.toHaveBeenCalled();
+    });
+
+    it('should reset timer when session.idle fires again during delay', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        idleDelaySecs: 5,
+        onComplete: onCompleteMock,
+      });
+
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'First message',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      // First idle
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      // Fast forward 3 seconds
+      jest.advanceTimersByTime(3000);
+
+      // Second idle - should reset timer
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      // Fast forward 3 more seconds (6 total, but timer was reset at 3s)
+      jest.advanceTimersByTime(3000);
+      await Promise.resolve();
+
+      // Should not be called yet (only 3s since reset)
+      expect(onCompleteMock).not.toHaveBeenCalled();
+
+      // Fast forward 2 more seconds (5s since reset)
+      jest.advanceTimersByTime(2000);
+      await Promise.resolve();
+
+      // Should be called now
+      expect(onCompleteMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle multiple sessions with independent delay timers', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        idleDelaySecs: 5,
+        onComplete: onCompleteMock,
+      });
+
+      // Session 1
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'Session 1 message',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      // Fast forward 2 seconds
+      jest.advanceTimersByTime(2000);
+
+      // Session 2
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's2',
+            id: 'm2',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p2',
+            type: 'text',
+            text: 'Session 2 message',
+            sessionID: 's2',
+            messageID: 'm2',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's2' },
+      });
+
+      // Fast forward 3 more seconds (5s total for s1, 3s for s2)
+      jest.advanceTimersByTime(3000);
+      await Promise.resolve();
+
+      // s1 should have fired
+      expect(onCompleteMock).toHaveBeenCalledTimes(1);
+      expect(onCompleteMock.mock.calls[0][0].messageContent).toBe('Session 1 message');
+
+      // Fast forward 2 more seconds (5s for s2)
+      jest.advanceTimersByTime(2000);
+      await Promise.resolve();
+
+      // s2 should have fired
+      expect(onCompleteMock).toHaveBeenCalledTimes(2);
+      expect(onCompleteMock.mock.calls[1][0].messageContent).toBe('Session 2 message');
+    });
+
+    it('should clear all pending timers on destroy', async () => {
+      const middleware = new AgentCompletionMiddleware({
+        context: mockContext,
+        idleDelaySecs: 5,
+        onComplete: onCompleteMock,
+      });
+
+      await middleware.handleEvent({
+        type: 'message.updated',
+        properties: {
+          info: {
+            role: 'assistant',
+            sessionID: 's1',
+            id: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'message.part.updated',
+        properties: {
+          part: {
+            id: 'p1',
+            type: 'text',
+            text: 'Test',
+            sessionID: 's1',
+            messageID: 'm1',
+          },
+        },
+      });
+
+      await middleware.handleEvent({
+        type: 'session.idle',
+        properties: { sessionID: 's1' },
+      });
+
+      // Destroy before timer fires
+      middleware.destroy();
+
+      // Fast forward time
+      jest.advanceTimersByTime(10000);
+      await Promise.resolve();
+
+      // Should not be called since destroyed
+      expect(onCompleteMock).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -9,11 +9,14 @@ interface SessionState {
     tokens?: { input: number; output: number; reasoning: number };
     cost?: number;
   };
+  pendingIdleTimer?: NodeJS.Timeout;  // Timer for delayed webhook sending
+  pendingIdlePayload?: AgentCompletedPayload;  // Stored payload for delayed send
 }
 
 interface MiddlewareOptions {
   context: PluginContext;
   debug?: boolean;
+  idleDelaySecs?: number;  // Delay in seconds before sending webhook after idle
   onComplete: (payload: AgentCompletedPayload) => Promise<void>;
 }
 
@@ -25,11 +28,13 @@ export class AgentCompletionMiddleware {
   private sessions: Map<string, SessionState> = new Map();
   private context: PluginContext;
   private debug: boolean;
+  private idleDelaySecs: number;
   private onComplete: (payload: AgentCompletedPayload) => Promise<void>;
 
   constructor(options: MiddlewareOptions) {
     this.context = options.context;
     this.debug = options.debug ?? false;
+    this.idleDelaySecs = options.idleDelaySecs ?? 0;
     this.onComplete = options.onComplete;
   }
 
@@ -76,6 +81,16 @@ export class AgentCompletionMiddleware {
     
     const state = this.sessions.get(sessionId)!;
     
+    // Cancel pending idle timer if activity resumes
+    if (state.pendingIdleTimer) {
+      clearTimeout(state.pendingIdleTimer);
+      state.pendingIdleTimer = undefined;
+      state.pendingIdlePayload = undefined;
+      if (this.debug) {
+        console.log(`[Middleware] Cancelled pending idle webhook for session ${sessionId} (activity resumed)`);
+      }
+    }
+    
     // Only track text parts from assistant messages
     if (!state.assistantMessageIds.has(messageId)) {
       if (this.debug) {
@@ -112,6 +127,16 @@ export class AgentCompletionMiddleware {
     }
     
     const state = this.sessions.get(sessionId)!;
+    
+    // Cancel pending idle timer if activity resumes
+    if (state.pendingIdleTimer) {
+      clearTimeout(state.pendingIdleTimer);
+      state.pendingIdleTimer = undefined;
+      state.pendingIdlePayload = undefined;
+      if (this.debug) {
+        console.log(`[Middleware] Cancelled pending idle webhook for session ${sessionId} (activity resumed)`);
+      }
+    }
     
     // Track this message ID as an assistant message
     state.assistantMessageIds.add(messageId);
@@ -162,15 +187,40 @@ export class AgentCompletionMiddleware {
         console.log(`[Middleware] Agent completed in "${sessionTitle}", message length: ${messageContent.length}`);
       }
       
-      await this.onComplete(payload);
+      // Handle delay logic
+      if (this.idleDelaySecs > 0) {
+        // Clear any existing timer (reset behavior)
+        if (state.pendingIdleTimer) {
+          clearTimeout(state.pendingIdleTimer);
+          if (this.debug) {
+            console.log(`[Middleware] Reset idle timer for session ${sessionId} (${this.idleDelaySecs}s)`);
+          }
+        } else {
+          if (this.debug) {
+            console.log(`[Middleware] Started idle timer for session ${sessionId} (${this.idleDelaySecs}s)`);
+          }
+        }
+        
+        // Start new delay timer
+        state.pendingIdleTimer = setTimeout(async () => {
+          if (this.debug) {
+            console.log(`[Middleware] Idle delay completed for session ${sessionId}, sending webhook`);
+          }
+          await this.onComplete(payload);
+          this.sessions.delete(sessionId);
+        }, this.idleDelaySecs * 1000);
+        
+        state.pendingIdlePayload = payload;
+      } else {
+        // No delay - send immediately
+        await this.onComplete(payload);
+        this.sessions.delete(sessionId);
+      }
       
     } catch (error) {
       if (this.debug) {
         console.error(`[Middleware] Error handling session.idle:`, error);
       }
-    } finally {
-      // Clear session state for next round of messages
-      this.sessions.delete(sessionId);
     }
   }
 
@@ -236,6 +286,15 @@ export class AgentCompletionMiddleware {
    * Clear all tracked state (useful for cleanup)
    */
   destroy(): void {
+    // Clear all pending idle timers
+    for (const [sessionId, state] of this.sessions) {
+      if (state.pendingIdleTimer) {
+        clearTimeout(state.pendingIdleTimer);
+        if (this.debug) {
+          console.log(`[Middleware] Cleared pending idle timer for session ${sessionId}`);
+        }
+      }
+    }
     this.sessions.clear();
   }
 }
