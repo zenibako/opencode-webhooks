@@ -9,7 +9,7 @@ interface SessionState {
     tokens?: { input: number; output: number; reasoning: number };
     cost?: number;
   };
-  pendingIdleTimer?: NodeJS.Timeout;  // Timer for delayed webhook sending
+  pendingIdleTimer?: ReturnType<typeof setTimeout>;  // Timer for delayed webhook sending
   pendingIdlePayload?: AgentCompletedPayload;  // Stored payload for delayed send
 }
 

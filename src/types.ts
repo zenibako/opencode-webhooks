@@ -129,3 +129,62 @@ export interface WebhookResult {
   attempts: number;
   rateLimitDelayed?: boolean;
 }
+
+// Agent completion middleware types
+
+/**
+ * Synthetic event constant for agent completion
+ */
+export const AGENT_COMPLETED_EVENT = 'agent.completed';
+
+/**
+ * Payload sent when agent completes work (session goes idle)
+ */
+export interface AgentCompletedPayload {
+  timestamp: string;
+  eventType: typeof AGENT_COMPLETED_EVENT;
+  sessionId: string;
+  sessionTitle: string;
+  messageContent: string;
+  messageId?: string;
+  tokens?: {
+    input: number;
+    output: number;
+    reasoning: number;
+  };
+  cost?: number;
+  [key: string]: any;
+}
+
+/**
+ * Simplified config for agent notification plugin
+ */
+export interface AgentNotificationConfig {
+  /** Webhook configurations (events not needed - always agent.completed) */
+  webhooks: Omit<WebhookConfig, 'events'>[];
+  /** Enable debug logging */
+  debug?: boolean;
+  /** Default timeout for all webhooks */
+  defaultTimeoutMs?: number;
+  /** Default retry configuration */
+  defaultRetry?: {
+    maxAttempts?: number;
+    delayMs?: number;
+  };
+  /** Optional: Delay in seconds to wait after session.idle before sending (default: 0 = immediate) */
+  idleDelaySecs?: number;
+}
+
+/**
+ * Context provided to the middleware from OpenCode plugin system
+ */
+export interface PluginContext {
+  project: {
+    id: string;
+    [key: string]: any;
+  };
+  directory: string;
+  worktree: string;
+  client: any;
+  $: any;
+}
