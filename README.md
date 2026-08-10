@@ -1,3 +1,5 @@
+
+
 # OpenCode Webhooks
 
 [![CI](https://github.com/zenibako/opencode-webhooks/actions/workflows/ci.yml/badge.svg)](https://github.com/zenibako/opencode-webhooks/actions/workflows/ci.yml)
@@ -336,6 +338,7 @@ The `examples/` directory contains ready-to-use configurations:
 - **[slack-workflow.ts](./examples/slack-workflow.ts)** - Slack Workflow Builder integration
 - **[slack-workflow-ratelimited.ts](./examples/slack-workflow-ratelimited.ts)** - Slack with rate limiting & queuing
 - **[custom-webhook.ts](./examples/custom-webhook.ts)** - Custom webhook endpoint
+- **[home-assistant.ts](./examples/home-assistant.ts)** - Home Assistant automation integration
 - **[local-dev.ts](./examples/local-dev.ts)** - Local development setup
 
 Simply copy an example to `~/.config/opencode/plugin/`, edit the configuration, and restart OpenCode.
